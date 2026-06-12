@@ -1,0 +1,15 @@
+[project]
+name = "trackeval"
+version = "1.0.0"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy",
+    "scipy",
+]
+
+[build-system]
+requires = [
+    "setuptools>=42",
+    "wheel"
+]
+build-backend = "setuptools.build_meta"

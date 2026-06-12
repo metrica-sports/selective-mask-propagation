@@ -1,0 +1,31 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.env
+*.so
+.DS_Store
+results/
+**/checkpoints/**
+temp*.mp4
+data
+precomputed/
+scripts/internal/
+
+# internal working files, never commit
+PLAN.md
+figures_scratch/
+assets/
+
+# vendored upstream extras we don't carry (see sam2/README.md, sam3/README.md)
+sam2/demo/
+sam2/notebooks/
+sam2/sav_dataset/
+sam2/training/
+sam2/tools/
+sam2/assets/
+sam2/.github/
+sam3/assets/
+sam3/examples/
+sam3/scripts/
+sam3/.github/
