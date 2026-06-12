@@ -48,11 +48,12 @@ cd vendor/sam2/checkpoints && bash download_ckpts.sh && cd ../../..
 
 SAM3 checkpoints are downloaded automatically on first use.
 
-### API Keys (GTA only)
+### GTA extras (only for `--gta`)
 
-The global track association module uses Gemini for team classification. Copy `.env.example` to `.env` and add your Gemini API key. Only needed when running with `--gta`.
+The global track association module needs extra dependencies and a Gemini API key for team classification:
 
 ```bash
+uv sync --extra gta
 cp .env.example .env
 # Edit .env and add your GEMINI_API_KEY
 ```

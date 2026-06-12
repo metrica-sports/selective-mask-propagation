@@ -11,7 +11,6 @@ dependencies = [
     "scipy",
     "lap>=0.5.12",
     "cython-bbox>=0.1.5",
-    "supervision>=0.27.0",
     "opencv-python>=4.10.0.84",
     "tqdm",
     "trackeval",
@@ -25,14 +24,16 @@ dependencies = [
     "einops>=0.8.2",
     "psutil>=7.2.2",
     "eva-decord>=0.6.1",
-    "transformers",
+    "zstandard>=0.25.0",
+]
+
+[project.optional-dependencies]
+gta = [
     "google-genai",
+    "transformers",
     "pydantic",
     "python-dotenv",
-    "pytorch-lightning>=2.6.1",
-    "nltk>=3.9.3",
     "scikit-learn>=1.8.0",
-    "zstandard>=0.25.0",
 ]
 
 [tool.uv.sources]
