@@ -69,16 +69,41 @@ def read_sequence_info(source_path: str) -> dict:
     return info
 
 
+def _artifact_variants(artifacts_dir: Path, filename: str) -> List[Path]:
+    """An artifact may be stored compressed (name.pkl.zst) or plain."""
+    paths = [artifacts_dir / filename]
+    if filename.endswith(".pkl"):
+        paths.append(artifacts_dir / (filename + ".zst"))
+    return paths
+
+
+def step_done(step: str, source_path: str, suffix: str = "", gta: bool = True) -> bool:
+    """True if every artifact and output of a step already exists on disk."""
+    artifacts_dir = get_artifacts_dir(source_path, suffix)
+    output_dir = get_output_dir(source_path, suffix)
+    artifacts = STEP_ARTIFACTS.get(step, [])
+    outputs = STEP_OUTPUTS.get(step, [])
+    if not gta:
+        artifacts = [f for f in artifacts if "gta" not in f]
+        outputs = [f for f in outputs if "gta" not in f]
+    if not artifacts and not outputs:
+        return False
+    for filename in artifacts:
+        if not any(p.exists() for p in _artifact_variants(artifacts_dir, filename)):
+            return False
+    return all((output_dir / filename).exists() for filename in outputs)
+
+
 def clean_steps(steps: list, source_path: str, suffix: str = "") -> None:
     artifacts_dir = get_artifacts_dir(source_path, suffix)
     output_dir = get_output_dir(source_path, suffix)
     cleaned = []
     for step in steps:
         for filename in STEP_ARTIFACTS.get(step, []):
-            path = artifacts_dir / filename
-            if path.exists():
-                path.unlink()
-                cleaned.append(filename)
+            for path in _artifact_variants(artifacts_dir, filename):
+                if path.exists():
+                    path.unlink()
+                    cleaned.append(path.name)
         for filename in STEP_OUTPUTS.get(step, []):
             path = output_dir / filename
             if path.exists():

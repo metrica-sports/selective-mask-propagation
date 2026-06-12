@@ -46,19 +46,19 @@ else
     INPUT_ARGS=("data/sportsmot/dataset/${SPLIT}/*")
 fi
 
-uv run python -m selective_mask_propagation.sportsmot --input "${INPUT_ARGS[@]}" --step detect --precomputed --gta $SAM_FLAG
-uv run python -m selective_mask_propagation.sportsmot --input "${INPUT_ARGS[@]}" --step track --precomputed --gta $SAM_FLAG
-uv run python -m selective_mask_propagation.sportsmot --input "${INPUT_ARGS[@]}" --step sam --precomputed --gta $SAM_FLAG
-uv run python -m selective_mask_propagation.sportsmot --input "${INPUT_ARGS[@]}" --step merge --precomputed --gta $SAM_FLAG
-uv run python -m selective_mask_propagation.sportsmot --input "${INPUT_ARGS[@]}" --step pose --precomputed --gta $SAM_FLAG
-uv run python -m selective_mask_propagation.sportsmot --input "${INPUT_ARGS[@]}" --step jersey --precomputed --gta $SAM_FLAG
-uv run python -m selective_mask_propagation.sportsmot --input "${INPUT_ARGS[@]}" --step classify --precomputed --gta $SAM_FLAG
-uv run python -m selective_mask_propagation.sportsmot --input "${INPUT_ARGS[@]}" --step embed --precomputed --gta $SAM_FLAG
-uv run python -m selective_mask_propagation.sportsmot --input "${INPUT_ARGS[@]}" --step match --precomputed --gta $SAM_FLAG
-uv run python -m selective_mask_propagation.sportsmot --input "${INPUT_ARGS[@]}" --step interp --precomputed --gta $SAM_FLAG
+uv run python -m selective_mask_propagation.sportsmot --input "${INPUT_ARGS[@]}" --step detect --precomputed --gta --skip-existing $SAM_FLAG
+uv run python -m selective_mask_propagation.sportsmot --input "${INPUT_ARGS[@]}" --step track --precomputed --gta --skip-existing $SAM_FLAG
+uv run python -m selective_mask_propagation.sportsmot --input "${INPUT_ARGS[@]}" --step sam --precomputed --gta --skip-existing $SAM_FLAG
+uv run python -m selective_mask_propagation.sportsmot --input "${INPUT_ARGS[@]}" --step merge --precomputed --gta --skip-existing $SAM_FLAG
+uv run python -m selective_mask_propagation.sportsmot --input "${INPUT_ARGS[@]}" --step pose --precomputed --gta --skip-existing $SAM_FLAG
+uv run python -m selective_mask_propagation.sportsmot --input "${INPUT_ARGS[@]}" --step jersey --precomputed --gta --skip-existing $SAM_FLAG
+uv run python -m selective_mask_propagation.sportsmot --input "${INPUT_ARGS[@]}" --step classify --precomputed --gta --skip-existing $SAM_FLAG
+uv run python -m selective_mask_propagation.sportsmot --input "${INPUT_ARGS[@]}" --step embed --precomputed --gta --skip-existing $SAM_FLAG
+uv run python -m selective_mask_propagation.sportsmot --input "${INPUT_ARGS[@]}" --step match --precomputed --gta --skip-existing $SAM_FLAG
+uv run python -m selective_mask_propagation.sportsmot --input "${INPUT_ARGS[@]}" --step interp --precomputed --gta --skip-existing $SAM_FLAG
 
 if [ "$SPLIT" != "test" ]; then
-    uv run python -m selective_mask_propagation.sportsmot --input "${INPUT_ARGS[@]}" --step eval --precomputed --gta $SAM_FLAG
+    uv run python -m selective_mask_propagation.sportsmot --input "${INPUT_ARGS[@]}" --step eval --precomputed --gta --skip-existing $SAM_FLAG
 fi
 
 echo "Done."

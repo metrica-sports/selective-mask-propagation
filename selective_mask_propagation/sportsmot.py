@@ -13,7 +13,7 @@ import argparse
 from typing import List, Optional
 
 from .utils.artifacts import get_output_dir, get_artifacts_dir, save_artifact, load_artifact
-from .utils.helpers import STEPS, GTA_STEPS, read_sequence_info, clean_steps, print_step, expand_input
+from .utils.helpers import STEPS, GTA_STEPS, read_sequence_info, clean_steps, step_done, print_step, expand_input
 
 
 def run_pipeline(
@@ -26,6 +26,7 @@ def run_pipeline(
     gta: bool = False,
     with_reid: bool = True,
     no_gt: bool = False,
+    skip_existing: bool = False,
 ):
     seq_info = read_sequence_info(source_path)
     fps = seq_info["fps"]
@@ -42,6 +43,13 @@ def run_pipeline(
     steps = STEPS[start_idx:] if continue_to_end else [start_step]
     if not gta:
         steps = [s for s in steps if s not in GTA_STEPS]
+    if skip_existing:
+        done = [s for s in steps if step_done(s, source_path, suffix, gta=gta)]
+        if done:
+            print(f"Skipping (already done): {', '.join(done)}")
+        steps = [s for s in steps if s not in done]
+        if not steps:
+            return
     clean_steps(steps, source_path, suffix)
 
     detections = embeddings = tracks = margins = sam_masks = windows = rename_events = match_history = None
@@ -347,21 +355,41 @@ def main(args_list: Optional[List[str]] = None):
                         help="Disable ReID (OSNet). Use pure EIoU association.")
     parser.add_argument("--no-gt", dest="no_gt", action="store_true",
                         help="Skip GT overlay in rendered videos.")
+    parser.add_argument("--skip-existing", action="store_true",
+                        help="Skip steps whose artifacts already exist, and keep going "
+                             "past per-clip failures. Makes long multi-clip runs resumable: "
+                             "re-run the same command after a crash to pick up where it stopped.")
     args = parser.parse_args(args_list)
 
     source_paths = []
     for inp in args.input:
         source_paths.extend(expand_input(inp))
 
+    failed = []
     for source_path in source_paths:
-        if args.step:
-            run_pipeline(source_path, args.step, args.continue_pipeline,
-                         precomputed=args.precomputed, dev=args.dev, sam3=args.sam3,
-                         gta=args.gta, with_reid=not args.no_reid, no_gt=args.no_gt)
-        else:
-            run_pipeline(source_path, "detect", continue_to_end=True,
-                         precomputed=args.precomputed, dev=args.dev, sam3=args.sam3,
-                         gta=args.gta, with_reid=not args.no_reid, no_gt=args.no_gt)
+        try:
+            if args.step:
+                run_pipeline(source_path, args.step, args.continue_pipeline,
+                             precomputed=args.precomputed, dev=args.dev, sam3=args.sam3,
+                             gta=args.gta, with_reid=not args.no_reid, no_gt=args.no_gt,
+                             skip_existing=args.skip_existing)
+            else:
+                run_pipeline(source_path, "detect", continue_to_end=True,
+                             precomputed=args.precomputed, dev=args.dev, sam3=args.sam3,
+                             gta=args.gta, with_reid=not args.no_reid, no_gt=args.no_gt,
+                             skip_existing=args.skip_existing)
+        except Exception:
+            if not args.skip_existing:
+                raise
+            import traceback
+            traceback.print_exc()
+            failed.append(source_path)
+
+    if failed:
+        print(f"\n{len(failed)} clip(s) failed (re-run with --skip-existing to retry only these):")
+        for p in failed:
+            print(f"  {p}")
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":
