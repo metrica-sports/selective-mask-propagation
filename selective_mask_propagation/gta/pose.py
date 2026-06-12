@@ -2,8 +2,6 @@
 
 Runs ViTPose on all detection bboxes to get body keypoints. The torso
 keypoints (shoulders + hips) define the crop region for jersey OCR.
-
-Ported from SAM-SORT: pose.py
 """
 
 from pathlib import Path
@@ -126,7 +124,8 @@ def estimate_all_poses(
 
         pending.append({
             "frame_idx": frame_idx,
-            "image": image.numpy() if isinstance(image, torch.Tensor) else image,
+            # DataLoader's default_convert turned the RGB np frame into a tensor
+            "image": image.numpy(),
             "boxes_xyxy": boxes_xyxy[valid],
             "valid": valid,
             "n_dets": len(dets),

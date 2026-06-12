@@ -6,8 +6,6 @@ Two-tier merge:
   2. Appearance: greedy agglomerative clustering on OSNet cosine distance.
      Vetoes (in order): temporal overlap, opposite-edge exit/entry,
      different teams, conflicting jersey numbers.
-
-Ported from SAM-SORT: match.py
 """
 
 from collections import defaultdict

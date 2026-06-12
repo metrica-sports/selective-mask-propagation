@@ -24,7 +24,6 @@ from ..config import (
     SEED_CONSECUTIVE,
     SEED_CLEAN_IOU,
     GAP_TRIGGER,
-    SAM_BORDER_MARGIN,
 )
 
 
@@ -315,19 +314,6 @@ def _find_seed_frame(
     return None
 
 
-def _mask_in_box(mask: np.ndarray, bbox: np.ndarray) -> float:
-    """IoMA: Intersection over Mask Area, |M ∩ B| / |M|."""
-    total = mask.sum()
-    if total == 0:
-        return 0.0
-    x1, y1, x2, y2 = int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])
-    h, w = mask.shape
-    x1, y1 = max(0, x1), max(0, y1)
-    x2, y2 = min(w, x2), min(h, y2)
-    inside = mask[y1:y2, x1:x2].sum()
-    return inside / total
-
-
 def _bbox_from_mask(mask: np.ndarray) -> np.ndarray:
     ys, xs = np.where(mask)
     return np.array([xs.min(), ys.min(), xs.max(), ys.max()], dtype=np.float64)
@@ -342,12 +328,6 @@ def _box_iou(a: np.ndarray, b: np.ndarray) -> float:
     area_a = (a[2] - a[0]) * (a[3] - a[1])
     area_b = (b[2] - b[0]) * (b[3] - b[1])
     return inter / (area_a + area_b - inter)
-
-
-def _mask_at_border(mask: np.ndarray) -> bool:
-    m = SAM_BORDER_MARGIN
-    return (mask[:m, :].any() or mask[-m:, :].any() or
-            mask[:, :m].any() or mask[:, -m:].any())
 
 
 @functools.cache

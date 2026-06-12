@@ -51,24 +51,25 @@ class _FrameMaskStats:
 
     Every quantity the window machine reads from a mask — area, tight bbox,
     border contact, pairwise overlap, per-track-box IoMA — is an integer
-    reduction over a boolean mask, so computing it on GPU is bit-identical
-    to the previous full-frame numpy code while avoiding per-pixel CPU work.
+    reduction over a boolean mask, so device placement cannot change the
+    result: window decisions stay bitwise-reproducible while the per-pixel
+    work stays off the CPU.
 
-    Masks with zero area are dropped, mirroring the old ``mask.any()``
-    storage filter; ``cids`` preserves the input (propagation output) order.
+    Masks with zero area are dropped; ``cids`` preserves input order.
     """
 
     def __init__(self, gpu_masks: Dict[int, torch.Tensor],
                  track_boxes: Dict[int, np.ndarray]):
-        self._masks = {}
+        self._masks: Dict[int, torch.Tensor] = {}
         self._track_boxes = track_boxes
         self._areas: Dict[int, int] = {}
         self._bboxes: Dict[int, np.ndarray] = {}
         self._border: Dict[int, bool] = {}
         self._ioma_rows: Dict[int, Dict[int, float]] = {}
+        self._intersections: Dict[frozenset, int] = {}
+        self.cids: List[int] = []
 
         if not gpu_masks:
-            self.cids: List[int] = []
             return
 
         device = next(iter(gpu_masks.values())).device
@@ -102,7 +103,6 @@ class _FrameMaskStats:
         self.cids = list(self._masks)
 
         pairs = [(a, b) for i, a in enumerate(self.cids) for b in self.cids[i + 1:]]
-        self._intersections: Dict[frozenset, int] = {}
         if pairs:
             inter = torch.stack([(self._masks[a] & self._masks[b]).sum() for a, b in pairs])
             for (a, b), v in zip(pairs, inter.cpu().numpy()):
@@ -126,27 +126,24 @@ class _FrameMaskStats:
     def ioma(self, cid: int) -> Dict[int, float]:
         """IoMA of this mask against every base-tracker bbox in the frame.
 
-        Same arithmetic as ``_mask_in_box``: integer crop sum over the
-        clipped box divided by the mask area. Computed lazily — only
-        windows past their entry frame need it.
+        Integer crop sum over the clipped box divided by the mask area.
+        Computed lazily — only windows past their entry frame need it.
         """
         if cid in self._ioma_rows:
             return self._ioma_rows[cid]
         mask = self._masks[cid]
         h, w = mask.shape
-        track_ids = list(self._track_boxes)
         sums = []
-        for tid in track_ids:
-            bbox = self._track_boxes[tid]
+        for bbox in self._track_boxes.values():
             x1, y1, x2, y2 = int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])
             x1, y1 = max(0, x1), max(0, y1)
             x2, y2 = min(w, x2), min(h, y2)
             sums.append(mask[y1:y2, x1:x2].sum())
         total = self._areas[cid]
-        row = {} if not sums else {
-            tid: int(s) / total
-            for tid, s in zip(track_ids, torch.stack(sums).cpu().numpy())
-        }
+        row: Dict[int, float] = {}
+        if sums:
+            for tid, s in zip(self._track_boxes, torch.stack(sums).cpu().numpy()):
+                row[tid] = int(s) / total
         self._ioma_rows[cid] = row
         return row
 

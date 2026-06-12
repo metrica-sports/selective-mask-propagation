@@ -7,8 +7,6 @@ Two-phase approach:
 Produces track_teams: {track_id: {"team_id": 0|1|None}}.
 Tracks classified as "other" (goalkeeper, referee, etc.) get team_id=None —
 they stay in the MOT but can't participate in jersey merge or team veto.
-
-Ported from SAM-SORT: classify_tracks.py
 """
 
 import asyncio

@@ -1,7 +1,4 @@
-"""Debug artifacts for GTA steps.
-
-Ported from SAM-SORT: debug.py
-"""
+"""Debug artifacts for GTA steps."""
 
 import json
 from pathlib import Path

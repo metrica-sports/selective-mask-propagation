@@ -3,8 +3,6 @@
 Two entry points:
   - run_jersey_ocr: detection-level OCR, runs once (shared by DE and SDE)
   - aggregate_jersey_numbers: per-track vote, runs per variant
-
-Ported from SAM-SORT: jersey.py + vote.py
 """
 
 from collections import Counter
@@ -96,7 +94,6 @@ class _CropDataset(torch.utils.data.Dataset):
             crop, crop_bbox = crop_torso(frame, pose["keypoints"], pose["scores"])
             if crop is None:
                 continue
-            # Skip if another detection overlaps the crop region
             if _crop_occluded(crop_bbox, det_idx, dets):
                 continue
             raw_crops.append(crop)
@@ -121,8 +118,7 @@ def run_jersey_ocr(
 
     A metadata sweep over pose_data picks the frames worth decoding, then
     DataLoader workers decode and prepare crop tensors while the main loop
-    runs PARSeq one frame-batch at a time (batch composition — and thus
-    output — is identical to the previous per-frame loop).
+    runs PARSeq one frame-batch at a time.
 
     Args:
         parseq: (model, tokenizer) from gta.models.get_parseq().
@@ -176,8 +172,8 @@ def run_jersey_ocr(
         frame_results = ocr_results[frame_idx]
         frame_crops = {}
         for i, det_idx in enumerate(crop_indices):
-            crop = raw_crops[i]
-            frame_crops[det_idx] = crop.numpy() if isinstance(crop, torch.Tensor) else crop
+            # DataLoader's default_convert turned the BGR np crops into tensors
+            frame_crops[det_idx] = raw_crops[i].numpy()
             char_confs = confidences[i]
             conf = char_confs.prod().item() if len(char_confs) > 0 else 0.0
             label = labels[i]
