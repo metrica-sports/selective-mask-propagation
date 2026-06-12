@@ -22,29 +22,27 @@ def get_artifacts_dir(source_path: str, suffix: str = "") -> Path:
     return artifacts_dir
 
 
-def save_artifact(name: str, data: Any, source_path: str, suffix: str = "") -> Path:
-    """Pickle data to artifacts dir. Uses zstd compression for mask artifacts."""
-    artifacts_dir = get_artifacts_dir(source_path, suffix)
+def save_pickle(name: str, data: Any, directory: Path) -> Path:
+    """Pickle data into a directory. Uses zstd compression for mask artifacts."""
     if name in COMPRESSED_ARTIFACTS:
         import zstandard as zstd
-        path = artifacts_dir / f"{name}.pkl.zst"
+        path = directory / f"{name}.pkl.zst"
         cctx = zstd.ZstdCompressor(level=3)
         with open(path, "wb") as f:
             with cctx.stream_writer(f) as compressor:
                 pickle.dump(data, compressor)
     else:
-        path = artifacts_dir / f"{name}.pkl"
+        path = directory / f"{name}.pkl"
         with open(path, "wb") as f:
             pickle.dump(data, f)
     print(f"  Saved: {path}")
     return path
 
 
-def load_artifact(name: str, source_path: str, suffix: str = "", allow_missing: bool = False) -> Any:
-    """Load pickled artifact. Supports both .pkl.zst and .pkl formats."""
-    artifacts_dir = get_artifacts_dir(source_path, suffix)
-    zst_path = artifacts_dir / f"{name}.pkl.zst"
-    pkl_path = artifacts_dir / f"{name}.pkl"
+def load_pickle(name: str, directory: Path, allow_missing: bool = False) -> Any:
+    """Load a pickled artifact from a directory (.pkl.zst or .pkl)."""
+    zst_path = directory / f"{name}.pkl.zst"
+    pkl_path = directory / f"{name}.pkl"
     if zst_path.exists():
         import zstandard as zstd
         dctx = zstd.ZstdDecompressor()
@@ -61,3 +59,13 @@ def load_artifact(name: str, source_path: str, suffix: str = "", allow_missing: 
     if allow_missing:
         return None
     raise FileNotFoundError(f"Artifact not found: {pkl_path}")
+
+
+def save_artifact(name: str, data: Any, source_path: str, suffix: str = "") -> Path:
+    """Pickle data to the sequence's artifacts dir."""
+    return save_pickle(name, data, get_artifacts_dir(source_path, suffix))
+
+
+def load_artifact(name: str, source_path: str, suffix: str = "", allow_missing: bool = False) -> Any:
+    """Load a pickled artifact from the sequence's artifacts dir."""
+    return load_pickle(name, get_artifacts_dir(source_path, suffix), allow_missing)

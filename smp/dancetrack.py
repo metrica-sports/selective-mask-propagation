@@ -18,19 +18,18 @@ Steps: detect, track, sam, merge, eval, render
 """
 
 import argparse
-import configparser
 import json
 import os
 import pickle
-import shutil
-import tempfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
 
+from .utils.artifacts import save_pickle as _save, load_pickle as _load
 from .utils.export import export_mot
+from .utils.helpers import read_sequence_info as _read_seq_info
 
 STEPS = ["detect", "track", "sam", "merge", "eval", "render"]
 TRACKERS = ["deepeiou", "bytetrack", "sort"]
@@ -81,60 +80,6 @@ def _experiment_artifacts_dir(source_path: str, tracker: str, sam3: bool, margin
     d = _experiment_dir(source_path, tracker, sam3, margin_entry) / "artifacts"
     d.mkdir(parents=True, exist_ok=True)
     return d
-
-
-COMPRESSED_ARTIFACTS = {"sam_masks", "merged"}
-
-
-def _save(name: str, data: Any, directory: Path) -> Path:
-    if name in COMPRESSED_ARTIFACTS:
-        import zstandard as zstd
-        path = directory / f"{name}.pkl.zst"
-        cctx = zstd.ZstdCompressor(level=3)
-        with open(path, "wb") as f:
-            with cctx.stream_writer(f) as compressor:
-                pickle.dump(data, compressor)
-    else:
-        path = directory / f"{name}.pkl"
-        with open(path, "wb") as f:
-            pickle.dump(data, f)
-    print(f"  Saved: {path}")
-    return path
-
-
-def _load(name: str, directory: Path, allow_missing: bool = False) -> Any:
-    zst_path = directory / f"{name}.pkl.zst"
-    pkl_path = directory / f"{name}.pkl"
-    if zst_path.exists():
-        import zstandard as zstd
-        dctx = zstd.ZstdDecompressor()
-        with open(zst_path, "rb") as f:
-            with dctx.stream_reader(f) as reader:
-                data = pickle.load(reader)
-        print(f"  Loaded: {zst_path}")
-        return data
-    if pkl_path.exists():
-        with open(pkl_path, "rb") as f:
-            data = pickle.load(f)
-        print(f"  Loaded: {pkl_path}")
-        return data
-    if allow_missing:
-        return None
-    raise FileNotFoundError(f"Artifact not found: {pkl_path}")
-
-
-def _read_seq_info(source_path: str) -> dict:
-    cfg = configparser.ConfigParser()
-    cfg.read(Path(source_path) / "seqinfo.ini")
-    seq = cfg["Sequence"]
-    info = {
-        "fps": int(seq["frameRate"]),
-        "width": int(seq["imWidth"]),
-        "height": int(seq["imHeight"]),
-        "length": int(seq["seqLength"]),
-    }
-    print(f"Video: {info['fps']} FPS, {info['width']}x{info['height']}, {info['length']} frames")
-    return info
 
 
 def _step_detect(
@@ -226,7 +171,7 @@ def _step_track(
 def _step_eval(source_path: str, output_dir: str, artifacts_dir: Path,
                total_frames: int = None) -> None:
     """Evaluate baseline and SAM-augmented MOT files against ground truth."""
-    import trackeval
+    from .core.eval import _eval_mot
 
     source = Path(source_path)
     if not (source / "gt" / "gt.txt").exists():
@@ -234,7 +179,6 @@ def _step_eval(source_path: str, output_dir: str, artifacts_dir: Path,
         return
 
     seq_name = source.name
-    gt_folder = str(source.parent)
 
     variants = [
         ("Baseline", "mot_baseline.txt", "baseline"),
@@ -248,55 +192,9 @@ def _step_eval(source_path: str, output_dir: str, artifacts_dir: Path,
         mot_path = artifacts_dir / filename
         if not mot_path.exists():
             continue
-
-        tmp_dir = tempfile.mkdtemp(prefix="trackeval_")
-        try:
-            tracker_data_dir = Path(tmp_dir) / "tracker" / "data"
-            tracker_data_dir.mkdir(parents=True)
-            shutil.copy2(str(mot_path), str(tracker_data_dir / f"{seq_name}.txt"))
-
-            dataset = trackeval.datasets.MotChallenge2DBox({
-                "GT_FOLDER": gt_folder,
-                "TRACKERS_FOLDER": tmp_dir,
-                "TRACKERS_TO_EVAL": ["tracker"],
-                "BENCHMARK": "",
-                "SPLIT_TO_EVAL": "",
-                "SKIP_SPLIT_FOL": True,
-                "DO_PREPROC": False,
-                "SEQ_INFO": {seq_name: None},
-                "CLASSES_TO_EVAL": ["pedestrian"],
-                "TRACKER_SUB_FOLDER": "data",
-                "PRINT_CONFIG": False,
-            })
-
-            raw_data = dataset.get_raw_seq_data("tracker", seq_name)
-            data = dataset.get_preprocessed_seq_data(raw_data, "pedestrian")
-
-            metrics_config = {"THRESHOLD": 0.5, "PRINT_CONFIG": False}
-            metrics = [
-                trackeval.metrics.HOTA(metrics_config),
-                trackeval.metrics.CLEAR(metrics_config),
-                trackeval.metrics.Identity(metrics_config),
-                trackeval.metrics.Count(),
-            ]
-            seq_res = {}
-            for metric in metrics:
-                seq_res[metric.get_name()] = metric.eval_sequence(data)
-
-            r = {
-                "hota": float(np.mean(seq_res["HOTA"]["HOTA"])) * 100,
-                "deta": float(np.mean(seq_res["HOTA"]["DetA"])) * 100,
-                "assa": float(np.mean(seq_res["HOTA"]["AssA"])) * 100,
-                "mota": float(seq_res["CLEAR"]["MOTA"]) * 100,
-                "idsw": int(seq_res["CLEAR"]["IDSW"]),
-                "idf1": float(seq_res["Identity"]["IDF1"]) * 100,
-                "gt_ids": int(seq_res["Count"]["GT_IDs"]),
-                "pred_ids": int(seq_res["Count"]["IDs"]),
-            }
-            columns.append((label, r))
-            eval_json[json_key] = r
-        finally:
-            shutil.rmtree(tmp_dir)
+        r, _ = _eval_mot(seq_name, source_path, str(mot_path))
+        columns.append((label, r))
+        eval_json[json_key] = r
 
     if not columns:
         print("No MOT files found to evaluate.")

@@ -63,8 +63,9 @@ def read_sequence_info(source_path: str) -> dict:
         "fps": int(seq["frameRate"]),
         "width": int(seq["imWidth"]),
         "height": int(seq["imHeight"]),
+        "length": int(seq["seqLength"]),
     }
-    print(f"Video: {info['fps']} FPS, {info['width']}x{info['height']}")
+    print(f"Video: {info['fps']} FPS, {info['width']}x{info['height']}, {info['length']} frames")
     return info
 
 

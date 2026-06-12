@@ -57,8 +57,7 @@ def _evaluate(tracks, source_path, label):
     import tempfile
     from pathlib import Path
 
-    import trackeval
-
+    from .core.eval import _eval_mot
     from .utils.export import export_mot
 
     gt_path = Path(source_path) / "gt" / "gt.txt"
@@ -67,44 +66,13 @@ def _evaluate(tracks, source_path, label):
         return
 
     seq_name = Path(source_path).name
-    gt_folder = str(Path(source_path).parent)
-
     tmp_dir = tempfile.mkdtemp()
     try:
-        tracker_dir = Path(tmp_dir) / "tracker" / "data"
-        tracker_dir.mkdir(parents=True)
-        export_mot(tracks, str(tracker_dir / f"{seq_name}.txt"))
-
-        dataset = trackeval.datasets.MotChallenge2DBox({
-            "GT_FOLDER": gt_folder,
-            "TRACKERS_FOLDER": tmp_dir,
-            "TRACKERS_TO_EVAL": ["tracker"],
-            "BENCHMARK": "", "SPLIT_TO_EVAL": "",
-            "SKIP_SPLIT_FOL": True, "DO_PREPROC": False,
-            "SEQ_INFO": {seq_name: None},
-            "CLASSES_TO_EVAL": ["pedestrian"],
-            "TRACKER_SUB_FOLDER": "data",
-            "PRINT_CONFIG": False,
-        })
-
-        raw_data = dataset.get_raw_seq_data("tracker", seq_name)
-        data = dataset.get_preprocessed_seq_data(raw_data, "pedestrian")
-
-        cfg = {"THRESHOLD": 0.5, "PRINT_CONFIG": False}
-        metrics = [
-            trackeval.metrics.HOTA(cfg),
-            trackeval.metrics.CLEAR(cfg),
-            trackeval.metrics.Identity(cfg),
-        ]
-        res = {}
-        for m in metrics:
-            res[m.get_name()] = m.eval_sequence(data)
-
-        hota = float(np.mean(res["HOTA"]["HOTA"])) * 100
-        assa = float(np.mean(res["HOTA"]["AssA"])) * 100
-        idf1 = float(res["Identity"]["IDF1"]) * 100
-        idsw = int(res["CLEAR"]["IDSW"])
-        print(f"  {label}: HOTA={hota:.1f}  AssA={assa:.1f}  IDF1={idf1:.1f}  IDSW={idsw}")
+        mot_path = str(Path(tmp_dir) / f"{seq_name}.txt")
+        export_mot(tracks, mot_path)
+        r, _ = _eval_mot(seq_name, source_path, mot_path)
+        print(f"  {label}: HOTA={r['hota']:.1f}  AssA={r['assa']:.1f}  "
+              f"IDF1={r['idf1']:.1f}  IDSW={r['idsw']}")
     finally:
         shutil.rmtree(tmp_dir)
 
