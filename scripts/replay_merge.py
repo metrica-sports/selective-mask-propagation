@@ -21,8 +21,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from sam_deep_eiou.core.merge import step_merge, extract_bboxes  # noqa: E402
-from sam_deep_eiou.utils.export import export_mot  # noqa: E402
+import smp.core.sam2  # noqa: E402
+from smp.core.merge import step_merge, extract_bboxes  # noqa: E402
+from smp.utils.export import export_mot  # noqa: E402
+
+# Artifacts pickled before the smp rename reference sam_deep_eiou.* paths.
+sys.modules.setdefault("sam_deep_eiou", sys.modules["smp"])
+sys.modules.setdefault("sam_deep_eiou.core", sys.modules["smp.core"])
+sys.modules.setdefault("sam_deep_eiou.core.sam2", sys.modules["smp.core.sam2"])
 
 
 def _load(artifacts: Path, name: str, allow_missing: bool = False):
@@ -85,7 +91,7 @@ def main():
         except Exception:
             status = "ERROR"
             traceback.print_exc()
-        results[clip_dir.name] = status
+        results[str(clip_dir)] = status
         print(f"{status:24s} {clip_dir.name}")
 
     n_pass = sum(1 for s in results.values() if s == "PASS")

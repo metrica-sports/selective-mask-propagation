@@ -36,6 +36,6 @@ fi
 cd "$(dirname "$0")/.."
 INPUT="data/dancetrack/${SPLIT}/dancetrack*"
 
-uv run python -m sam_deep_eiou.dancetrack --input "$INPUT" $SAM_FLAG $TRACKER_FLAG --precomputed --skip-existing
+uv run python -m smp.dancetrack --input "$INPUT" $SAM_FLAG $TRACKER_FLAG --precomputed --skip-existing
 
 echo "Done."

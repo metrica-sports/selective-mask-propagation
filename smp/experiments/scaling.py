@@ -12,9 +12,9 @@ on every clip in the input list. Per-clip artifacts persist incrementally to
 file already present is skipped unless ``--force`` is passed.
 
 CLI:
-    uv run python -m sam_deep_eiou.experiments.scaling <clip>... --variant de_uniform_sam3
-    uv run python -m sam_deep_eiou.experiments.scaling <clip>... --variant sam3_deep_eiou
-    uv run python -m sam_deep_eiou.experiments.scaling <clip>... --variant sam3_deep_eiou --triggers margin_gap
+    uv run python -m smp.experiments.scaling <clip>... --variant de_uniform_sam3
+    uv run python -m smp.experiments.scaling <clip>... --variant sam3_deep_eiou
+    uv run python -m smp.experiments.scaling <clip>... --variant sam3_deep_eiou --triggers margin_gap
 
 Variants and the file they persist to:
     de_uniform_sam3                                → de_uniform_sam3.json

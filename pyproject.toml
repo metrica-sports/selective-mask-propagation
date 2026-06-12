@@ -1,7 +1,7 @@
 [project]
-name = "sam-deep-eiou"
+name = "selective-mask-propagation"
 version = "0.1.0"
-description = "Selective mask propagation for multi-object tracking: SAM + Deep-EIoU"
+description = "Selective mask propagation for multi-object tracking"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [{ name = "Alexander Holmberg", email = "alholmbe@kth.se" }]

@@ -4,10 +4,10 @@ Runs YOLOX (DanceTrack checkpoint) + OSNet for detections and embeddings,
 then a base tracker (Deep-EIoU, ByteTrack, or SORT), then selective mask propagation.
 
 CLI:
-    uv run python -m sam_deep_eiou.dancetrack --input "data/dancetrack/val/dancetrack0007"
-    uv run python -m sam_deep_eiou.dancetrack --input "data/dancetrack/val/dancetrack0007" --tracker bytetrack
-    uv run python -m sam_deep_eiou.dancetrack --input "data/dancetrack/val/dancetrack0007" --step sam -c --sam3
-    uv run python -m sam_deep_eiou.dancetrack --input "data/dancetrack/val/dancetrack00*" --step eval
+    uv run python -m smp.dancetrack --input "data/dancetrack/val/dancetrack0007"
+    uv run python -m smp.dancetrack --input "data/dancetrack/val/dancetrack0007" --tracker bytetrack
+    uv run python -m smp.dancetrack --input "data/dancetrack/val/dancetrack0007" --step sam -c --sam3
+    uv run python -m smp.dancetrack --input "data/dancetrack/val/dancetrack00*" --step eval
 
 Results layout:
     results/val/{seq}/artifacts/                        # shared detect artifacts

@@ -1,6 +1,6 @@
-# SAM-Deep-EIoU
+# Selective Mask Propagation
 
-Selective mask propagation for multi-object tracking. Monitors the assignment margin in the Hungarian cost matrix and selectively invokes SAM to preserve identity through occlusions. Only modifies the base tracker's output when positive evidence of an identity switch is found.
+Selective mask propagation (SMP) for multi-object tracking. Monitors the assignment margin in the Hungarian cost matrix and selectively invokes SAM to preserve identity through occlusions. Only modifies the base tracker's output when positive evidence of an identity switch is found. The flagship instantiation, **SAM3-Deep-EIoU**, combines Deep-EIoU with SAM 3.
 
 **86.8 HOTA on SportsMOT** — [#1 on the official leaderboard](https://www.codabench.org/competitions/13077/#/results-tab) (June 2026). Consistent improvements across three base trackers on DanceTrack.
 
@@ -115,7 +115,7 @@ uv run python scripts/download_precomputed.py dancetrack                  # val,
 Run on a single SportsMOT val sequence (basketball, +9.4 HOTA over baseline):
 
 ```bash
-uv run python -m sam_deep_eiou.sportsmot \
+uv run python -m smp.sportsmot \
   --input data/sportsmot/dataset/val/v_00HRwkvvjtQ_c005 \
   --precomputed --sam3
 ```
@@ -123,7 +123,7 @@ uv run python -m sam_deep_eiou.sportsmot \
 Run on a single DanceTrack val sequence (+26.7 HOTA over baseline):
 
 ```bash
-uv run python -m sam_deep_eiou.dancetrack \
+uv run python -m smp.dancetrack \
   --input data/dancetrack/val/dancetrack0007 --precomputed --sam3
 ```
 
@@ -132,7 +132,7 @@ uv run python -m sam_deep_eiou.dancetrack \
 Runs Deep-EIoU, augments with SAM, and prints before/after metrics:
 
 ```bash
-uv run python -m sam_deep_eiou.augment data/sportsmot/dataset/val/v_00HRwkvvjtQ_c005 --sam3
+uv run python -m smp.augment data/sportsmot/dataset/val/v_00HRwkvvjtQ_c005 --sam3
 ```
 
 ## API
@@ -140,7 +140,7 @@ uv run python -m sam_deep_eiou.augment data/sportsmot/dataset/val/v_00HRwkvvjtQ_
 To augment your own tracker, extract the assignment margin from the cost matrix (`second_best - best` per matched column) and call `augment`:
 
 ```python
-from sam_deep_eiou.augment import augment
+from smp.augment import augment
 
 # tracks: {frame: {track_id: [x1, y1, x2, y2]}}
 # margins: {frame: {track_id: float}}
@@ -172,7 +172,7 @@ bash scripts/run_dancetrack.sh val sam3 --tracker sort
 GTA links tracklets across frame-boundary exits using jersey recognition, team classification, and appearance embeddings. It operates on finished tracklets and does not modify the tracking or SAM steps. Enable with `--gta` (requires `GEMINI_API_KEY` in `.env`).
 
 ```bash
-uv run python -m sam_deep_eiou.sportsmot \
+uv run python -m smp.sportsmot \
   --input data/sportsmot/dataset/val/v_00HRwkvvjtQ_c001 \
   --precomputed --gta --sam3
 ```
@@ -189,11 +189,11 @@ These are straightforward to improve and would make good contributions.
 
 This repository builds on and vendors code from the following projects:
 
-- [Deep-EIoU](https://github.com/hsiangwei0903/Deep-EIoU) — base tracker (`sam_deep_eiou/deep_eiou/`)
+- [Deep-EIoU](https://github.com/hsiangwei0903/Deep-EIoU) — base tracker (`smp/deep_eiou/`)
 - [ByteTrack](https://github.com/FoundationVision/ByteTrack) (MIT) and [SORT](https://github.com/abewley/sort) (GPL-3.0) — alternative base trackers for the cross-tracker comparison
-- [YOLOX](https://github.com/Megvii-BaseDetection/YOLOX) (Apache-2.0) — detector (`sam_deep_eiou/yolox/`)
-- [OSNet / deep-person-reid](https://github.com/KaiyangZhou/deep-person-reid) (MIT) — appearance embeddings (`sam_deep_eiou/osnet/`)
-- [SAM 2](https://github.com/facebookresearch/sam2) (Apache-2.0) and [SAM 3](https://github.com/facebookresearch/sam3) (SAM License) — VOS models, vendored in `sam2/` and `sam3/` with their original licenses
+- [YOLOX](https://github.com/Megvii-BaseDetection/YOLOX) (Apache-2.0) — detector (`smp/yolox/`)
+- [OSNet / deep-person-reid](https://github.com/KaiyangZhou/deep-person-reid) (MIT) — appearance embeddings (`smp/osnet/`)
+- [SAM 2](https://github.com/facebookresearch/sam2) (Apache-2.0) and [SAM 3](https://github.com/facebookresearch/sam3) (SAM License) — VOS models, vendored in `vendor/` with their original licenses
 - [TrackEval](https://github.com/JonathonLuiten/TrackEval) (MIT) — evaluation (`TrackEval/`)
 - [GTA](https://github.com/sjc042/gta-link) — global tracklet association formulation
 - Jersey OCR follows [Koshkina & Elder](https://github.com/mkoshkina/jersey-number-pipeline), using [ViTPose](https://github.com/ViTAE-Transformer/ViTPose) and [PARSeq](https://github.com/baudm/parseq) via HuggingFace Transformers

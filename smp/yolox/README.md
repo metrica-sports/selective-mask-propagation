@@ -18,7 +18,7 @@ The YOLOX experiment system sets `eps=1e-3` on all BatchNorm2d layers via an `in
 ## Verification
 
 ```
-uv run python -m sam_deep_eiou.yolox.test_yolox
+uv run python -m smp.yolox.test_yolox
 ```
 
 Runs inference on 10 SportsMOT val clips and compares against pre-computed `det.txt` files. Results: exact detection count match on all clips, sub-pixel box differences (mean <1px, p99 <0.1px), score differences <0.005.

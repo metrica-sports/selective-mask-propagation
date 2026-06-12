@@ -1,9 +1,9 @@
 """SportsMOT pipeline: detect -> track -> sam -> merge -> [GTA] -> eval -> render
 
 CLI:
-    uv run python -m sam_deep_eiou.sportsmot --input "data/sportsmot/dataset/val/v_00HRwkvvjtQ_c005" --precomputed -d --sam3
-    uv run python -m sam_deep_eiou.sportsmot --input "data/sportsmot/dataset/val/v_0kUtTtmLaJA_c006" --step sam -c -d
-    uv run python -m sam_deep_eiou.sportsmot --input "data/sportsmot/dataset/val/v_2QhNRucNC7E_c017" --step eval
+    uv run python -m smp.sportsmot --input "data/sportsmot/dataset/val/v_00HRwkvvjtQ_c005" --precomputed -d --sam3
+    uv run python -m smp.sportsmot --input "data/sportsmot/dataset/val/v_0kUtTtmLaJA_c006" --step sam -c -d
+    uv run python -m smp.sportsmot --input "data/sportsmot/dataset/val/v_2QhNRucNC7E_c017" --step eval
 
 Steps: detect, track, sam, merge, pose, jersey, classify, embed, match, interp, eval, render
        --gta enables: pose, jersey, classify, embed, match, interp
