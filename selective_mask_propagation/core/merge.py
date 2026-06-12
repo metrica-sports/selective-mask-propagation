@@ -347,12 +347,11 @@ def _find_raw_tid_for_bbox(
     raw_frame_tracks: Dict[int, np.ndarray],
     claimed_raw_tids: set[int],
 ) -> Optional[int]:
-    """Best-effort mapping from bbox object identity back to raw track id."""
-    target_id = id(bbox)
+    """Best-effort mapping from a bbox value back to its raw track id."""
     for raw_tid, raw_bbox in raw_frame_tracks.items():
         if raw_tid in claimed_raw_tids:
             continue
-        if id(raw_bbox) == target_id:
+        if np.array_equal(raw_bbox, bbox):
             return raw_tid
     return None
 
