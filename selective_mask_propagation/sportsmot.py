@@ -301,19 +301,15 @@ def run_pipeline(
         from .core.interp import interpolate_tracks
         from .utils.export import export_mot, parse_mot
 
-        track_teams_de = load_artifact("track_teams_de", source_path, suffix)
-        other_ids_de = {tid for tid, t in track_teams_de.items() if t["team_id"] is None}
         de_gta_tracks = parse_mot(str(artifacts_dir / "mot_de_gta.txt"))
-        de_gta_interp = interpolate_tracks(de_gta_tracks, skip_ids=other_ids_de)
+        de_gta_interp = interpolate_tracks(de_gta_tracks)
         de_gta_combined = {f: dict(ft) for f, ft in de_gta_tracks.items()}
         for f, ft in de_gta_interp.items():
             de_gta_combined.setdefault(f, {}).update(ft)
         export_mot(de_gta_combined, str(artifacts_dir / "mot_de_gta_interp.txt"))
 
-        track_teams_sde = load_artifact("track_teams_sde", source_path, suffix)
-        other_ids_sde = {tid for tid, t in track_teams_sde.items() if t["team_id"] is None}
         sde_gta_tracks = parse_mot(str(artifacts_dir / "mot_sde_gta.txt"))
-        sde_gta_interp = interpolate_tracks(sde_gta_tracks, skip_ids=other_ids_sde)
+        sde_gta_interp = interpolate_tracks(sde_gta_tracks)
         sde_gta_combined = {f: dict(ft) for f, ft in sde_gta_tracks.items()}
         for f, ft in sde_gta_interp.items():
             sde_gta_combined.setdefault(f, {}).update(ft)

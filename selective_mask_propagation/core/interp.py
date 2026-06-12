@@ -1,6 +1,6 @@
 """Linear bbox interpolation for track gaps."""
 
-from typing import Dict, Optional, Set
+from typing import Dict
 
 import numpy as np
 
@@ -12,7 +12,6 @@ DIST_THRESH = 200  # Maximum center-to-center distance for interpolation
 
 def interpolate_tracks(
     tracks: Dict[int, Dict[int, np.ndarray]],
-    skip_ids: Optional[Set[int]] = None,
 ) -> Dict[int, Dict[int, np.ndarray]]:
     """Fill track gaps with linearly interpolated bboxes.
 
@@ -37,8 +36,6 @@ def interpolate_tracks(
     total = 0
 
     for track_id, entries in track_frames.items():
-        if skip_ids and track_id in skip_ids:
-            continue
         if len(entries) < N_MIN:
             continue
         entries.sort(key=lambda e: e[0])
