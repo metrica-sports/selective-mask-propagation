@@ -10,8 +10,8 @@ API:
     corrected_tracks = augment(tracks, margins, "path/to/sequence")
 
 Test:
-    uv run python -m sam_deep_eiou.augment ../data/raw/sportsmot/dataset/val/v_00HRwkvvjtQ_c005 --sam3
-    uv run python -m sam_deep_eiou.augment ../data/raw/dancetrack/val/dancetrack0007 --sam3
+    uv run python -m sam_deep_eiou.augment data/sportsmot/dataset/val/v_00HRwkvvjtQ_c005 --sam3
+    uv run python -m sam_deep_eiou.augment data/dancetrack/val/dancetrack0007 --sam3
 """
 
 from typing import Dict

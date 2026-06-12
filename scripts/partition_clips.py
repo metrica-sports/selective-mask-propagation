@@ -1,8 +1,8 @@
 """Partition clips into N subsets balanced by frame count.
 
 Usage:
-    uv run python sam_deep_eiou/scripts/partition_clips.py ../data/raw/sportsmot/dataset/test 6
-    uv run python sam_deep_eiou/scripts/partition_clips.py ../data/raw/sportsmot/dataset/val 3
+    uv run python scripts/partition_clips.py data/sportsmot/dataset/test 6
+    uv run python scripts/partition_clips.py data/sportsmot/dataset/val 3
 
 Writes partitions/<split>_0.txt, partitions/<split>_1.txt, etc.
 Each file contains one clip path per line.

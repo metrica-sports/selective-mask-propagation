@@ -179,7 +179,7 @@ uv run python -m sam_deep_eiou.sportsmot \
 
 The current GTA implementation is not optimized for speed or model efficiency:
 
-- **Pose estimation** uses ViTPose-large via HuggingFace Transformers. Model loading is slow. A smaller ViTPose variant would likely produce equivalent results since only torso keypoints (shoulders + hips) are used.
+- **Pose estimation** uses ViTPose+ (base) via HuggingFace Transformers. Model loading is slow. A smaller ViTPose variant would likely produce equivalent results since only torso keypoints (shoulders + hips) are used.
 - **Jersey OCR** uses PARSeq via HuggingFace Transformers. Same slow loading issue.
 - **Team classification** uses Gemini Flash, a proprietary API. The task is simple (classify player crop as team A, team B, or other) and could be replaced with a small open-source VLM.
 

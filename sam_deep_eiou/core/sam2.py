@@ -1,11 +1,11 @@
 """SAM step: margin-triggered SAM2 propagation with runtime exit.
 
-Scans Deep-EIoU margins to find ambiguous windows (margin < 0.01),
-seeds SAM2 from clean pre-ambiguity frames (margin >= 0.10), and
-propagates through the window. Exit is determined at runtime: each
-frame, IoMA identifies which track bbox contains the mask, and that
-track's margin is checked. Single forward pass with dynamic object
-add/remove.
+Scans base-tracker margins to find ambiguous windows (margin <
+MARGIN_ENTRY), seeds SAM2 from clean pre-ambiguity frames (margin >=
+SEED_MARGIN), and propagates through the window. Exit is determined at
+runtime: each frame, IoMA identifies which track bbox contains the
+mask, and that track's margin is checked. Single forward pass with
+dynamic object add/remove.
 """
 
 import sys

@@ -1,9 +1,9 @@
 """Aggregate eval.json files from a SportsMOT val set run.
 
 Usage:
-    uv run python sam_deep_eiou/scripts/aggregate_eval.py results/val
-    uv run python sam_deep_eiou/scripts/aggregate_eval.py results/val --phase sam_deep_eiou
-    uv run python sam_deep_eiou/scripts/aggregate_eval.py results/val --sports ../data/raw/sportsmot/splits_txt
+    uv run python scripts/aggregate_eval.py results/val
+    uv run python scripts/aggregate_eval.py results/val --phase sam_deep_eiou
+    uv run python scripts/aggregate_eval.py results/val --sports data/sportsmot/splits_txt
 """
 
 import argparse
