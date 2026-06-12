@@ -12,7 +12,6 @@ from typing import Dict, List, Optional, Tuple
 import cv2
 import numpy as np
 import torch
-from PIL import Image
 from tqdm import tqdm
 
 TORSO_KP_INDICES = [5, 6, 11, 12]  # left_shoulder, right_shoulder, left_hip, right_hip
@@ -20,37 +19,7 @@ TORSO_KP_INDICES = [5, 6, 11, 12]  # left_shoulder, right_shoulder, left_hip, ri
 VITPOSE_MODEL = "usyd-community/vitpose-plus-base"
 
 
-def _run_pose(image, boxes_xyxy: np.ndarray, processor, model) -> List[dict]:
-    """Run ViTPose on an image with given bounding boxes.
-
-    Returns list of {"keypoints": (17,2), "scores": (17,)} per box.
-    """
-    if len(boxes_xyxy) == 0:
-        return []
-
-    boxes_xywh = boxes_xyxy.copy()
-    boxes_xywh[:, 2] = boxes_xyxy[:, 2] - boxes_xyxy[:, 0]
-    boxes_xywh[:, 3] = boxes_xyxy[:, 3] - boxes_xyxy[:, 1]
-
-    inputs = processor(image, boxes=[boxes_xywh], return_tensors="pt").to(model.device)
-
-    with torch.no_grad(), torch.amp.autocast(device_type="cuda", enabled=False):
-        inputs = {k: v.float() if v.dtype == torch.bfloat16 else v for k, v in inputs.items()}
-        dataset_index = torch.zeros(len(boxes_xyxy), dtype=torch.long, device=model.device)
-        outputs = model(**inputs, dataset_index=dataset_index)
-
-    if outputs.heatmaps.dtype == torch.bfloat16:
-        outputs.heatmaps = outputs.heatmaps.float()
-
-    pose_results = processor.post_process_pose_estimation(outputs, boxes=[boxes_xywh])
-
-    results = []
-    for pose_result in pose_results[0]:
-        results.append({
-            "keypoints": pose_result["keypoints"].cpu().numpy(),
-            "scores": pose_result["scores"].cpu().numpy(),
-        })
-    return results
+POSE_BATCH = 256  # crops per forward; frames accumulate until this fills
 
 
 def _frame_generator(source_path: str):
@@ -67,6 +36,63 @@ def _frame_generator(source_path: str):
     return len(frame_files), gen()
 
 
+class _FrameDataset(torch.utils.data.Dataset):
+    """Worker-decoded RGB frames for an image sequence directory."""
+
+    def __init__(self, frame_files: List[Path]):
+        self.frame_files = frame_files
+
+    def __len__(self) -> int:
+        return len(self.frame_files)
+
+    def __getitem__(self, idx: int):
+        frame = cv2.imread(str(self.frame_files[idx]))
+        return idx, cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+
+def _flush_pose_batch(pending: List[dict], processor, model, pose_data: Dict[int, list]) -> None:
+    """One forward over all accumulated frames' crops, scattered back per frame."""
+    if not pending:
+        return
+
+    boxes_groups = []
+    for p in pending:
+        xyxy = p["boxes_xyxy"]
+        xywh = xyxy.copy()
+        xywh[:, 2] = xyxy[:, 2] - xyxy[:, 0]
+        xywh[:, 3] = xyxy[:, 3] - xyxy[:, 1]
+        boxes_groups.append(xywh)
+
+    inputs = processor([p["image"] for p in pending], boxes=boxes_groups,
+                       return_tensors="pt").to(model.device)
+    n_crops = sum(len(g) for g in boxes_groups)
+
+    with torch.no_grad(), torch.amp.autocast(device_type="cuda", enabled=False):
+        inputs = {k: v.float() if v.dtype == torch.bfloat16 else v for k, v in inputs.items()}
+        dataset_index = torch.zeros(n_crops, dtype=torch.long, device=model.device)
+        outputs = model(**inputs, dataset_index=dataset_index)
+
+    if outputs.heatmaps.dtype == torch.bfloat16:
+        outputs.heatmaps = outputs.heatmaps.float()
+
+    pose_results = processor.post_process_pose_estimation(outputs, boxes=boxes_groups)
+
+    for p, group in zip(pending, pose_results):
+        results = [{
+            "keypoints": r["keypoints"].cpu().numpy(),
+            "scores": r["scores"].cpu().numpy(),
+        } for r in group]
+        frame_poses = []
+        result_idx = 0
+        for i in range(p["n_dets"]):
+            if p["valid"][i]:
+                frame_poses.append(results[result_idx])
+                result_idx += 1
+            else:
+                frame_poses.append(None)
+        pose_data[p["frame_idx"]] = frame_poses
+
+
 def estimate_all_poses(
     source_path: str,
     detections: Dict[int, np.ndarray],
@@ -75,27 +101,35 @@ def estimate_all_poses(
 ) -> Dict[int, list]:
     """Run ViTPose on every detection bbox in every frame.
 
-    Algorithm:
-        1. For each frame, extract detection bboxes (xyxy)
-        2. Filter degenerate boxes (zero width/height)
-        3. Run ViTPose batch inference
-        4. Map results back to original detection indices
+    Frames are decoded by DataLoader workers and their crops accumulate
+    into one forward per POSE_BATCH crops — a 256x192-crop ViT is far
+    too small to saturate a GPU at one-frame-per-forward.
 
     Returns {frame_idx: [{"keypoints": (17,2), "scores": (17,)}, ...]}.
     List is aligned with detections[frame_idx] — pose_data[i][j] corresponds
     to detections[i][j].
     """
-    total_frames, frame_gen = _frame_generator(source_path)
-    pose_data: Dict[int, list] = {}
+    frame_dir = Path(source_path) / "img1"
+    frame_files = sorted(frame_dir.glob("*.jpg"))
+    if not frame_files:
+        raise FileNotFoundError(f"No jpg frames found in {frame_dir}")
 
-    for frame_idx, frame in enumerate(tqdm(frame_gen, total=total_frames, desc="Pose")):
+    loader = torch.utils.data.DataLoader(
+        _FrameDataset(frame_files), batch_size=None, num_workers=4, prefetch_factor=4,
+    )
+
+    pose_data: Dict[int, list] = {}
+    pending: List[dict] = []
+    pending_crops = 0
+
+    for frame_idx, image in tqdm(loader, total=len(frame_files), desc="Pose"):
+        frame_idx = int(frame_idx)
         dets = detections.get(frame_idx)
         if dets is None or len(dets) == 0:
             pose_data[frame_idx] = []
             continue
 
         boxes_xyxy = dets[:, :4]
-
         widths = boxes_xyxy[:, 2] - boxes_xyxy[:, 0]
         heights = boxes_xyxy[:, 3] - boxes_xyxy[:, 1]
         valid = (widths > 0) & (heights > 0)
@@ -104,20 +138,20 @@ def estimate_all_poses(
             pose_data[frame_idx] = [None] * len(dets)
             continue
 
-        valid_boxes = boxes_xyxy[valid]
-        image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-        results = _run_pose(image, valid_boxes, processor, model)
+        pending.append({
+            "frame_idx": frame_idx,
+            "image": image.numpy() if isinstance(image, torch.Tensor) else image,
+            "boxes_xyxy": boxes_xyxy[valid],
+            "valid": valid,
+            "n_dets": len(dets),
+        })
+        pending_crops += int(valid.sum())
 
-        frame_poses = []
-        result_idx = 0
-        for i in range(len(dets)):
-            if valid[i]:
-                frame_poses.append(results[result_idx])
-                result_idx += 1
-            else:
-                frame_poses.append(None)
-        pose_data[frame_idx] = frame_poses
+        if pending_crops >= POSE_BATCH:
+            _flush_pose_batch(pending, processor, model, pose_data)
+            pending, pending_crops = [], 0
 
+    _flush_pose_batch(pending, processor, model, pose_data)
     return pose_data
 
 
