@@ -178,6 +178,9 @@ def run_jersey_ocr(
             conf = char_confs.prod().item() if len(char_confs) > 0 else 0.0
             label = labels[i]
 
+            # 1 and 7 are rejected outright: player silhouettes (torso edges,
+            # limbs) systematically OCR as these digits, so false positives
+            # would swamp real reads in the per-track vote.
             if not label.isdigit() or not (1 <= int(label) <= 99) or int(label) in (1, 7):
                 label = ""
                 conf = 0.0
