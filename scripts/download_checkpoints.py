@@ -1,9 +1,10 @@
-"""Download YOLOX and OSNet checkpoints from HuggingFace.
+"""Download model checkpoints from HuggingFace.
 
-Only needed if running detection from scratch (without --precomputed).
+YOLOX + OSNet are only needed when running detection from scratch
+(without --precomputed). ViTPose + PARSeq are needed for --gta; they can
+also be regenerated locally via the convert.py in each package.
 
 Usage:
-    cd SAM-Deep-EIoU
     uv run python scripts/download_checkpoints.py
 """
 
@@ -19,6 +20,10 @@ CHECKPOINTS = [
     ("checkpoints/yolox_x_sports_mix.pth.tar", "selective_mask_propagation/yolox/checkpoints/yolox_x_sports_mix.pth.tar"),
     ("checkpoints/yolox_x_dancetrack.pth.tar", "selective_mask_propagation/yolox/checkpoints/yolox_x_dancetrack.pth.tar"),
     ("checkpoints/osnet_sports.pth.tar", "selective_mask_propagation/osnet/checkpoints/sports_model.pth.tar-60"),
+    ("checkpoints/parseq.safetensors", "selective_mask_propagation/parseq/checkpoints/parseq.safetensors"),
+    ("checkpoints/parseq-config.json", "selective_mask_propagation/parseq/checkpoints/parseq-config.json"),
+    ("checkpoints/vitpose-plus-base.safetensors", "selective_mask_propagation/vitpose/checkpoints/vitpose-plus-base.safetensors"),
+    ("checkpoints/vitpose-plus-base-config.json", "selective_mask_propagation/vitpose/checkpoints/vitpose-plus-base-config.json"),
 ]
 
 

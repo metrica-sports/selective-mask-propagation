@@ -177,13 +177,9 @@ uv run python -m selective_mask_propagation.sportsmot \
   --precomputed --gta --sam3
 ```
 
-The current GTA implementation is not optimized for speed or model efficiency:
-
-- **Pose estimation** uses ViTPose+ (base) via HuggingFace Transformers. Model loading is slow. A smaller ViTPose variant would likely produce equivalent results since only torso keypoints (shoulders + hips) are used.
-- **Jersey OCR** uses PARSeq via HuggingFace Transformers. Same slow loading issue.
-- **Team classification** uses Gemini Flash, a proprietary API. The task is simple (classify player crop as team A, team B, or other) and could be replaced with a small open-source VLM.
-
-These are straightforward to improve and would make good contributions.
+- **Pose estimation** uses ViTPose+ (base) via a standalone implementation (`selective_mask_propagation/vitpose/`) loading local safetensors. A smaller ViTPose variant would likely produce equivalent results since only torso keypoints (shoulders + hips) are used.
+- **Jersey OCR** uses PARSeq via a standalone implementation (`selective_mask_propagation/parseq/`), no torch.hub.
+- **Team classification** uses Gemini Flash, a proprietary API. The task is simple (classify player crop as team A, team B, or other) and could be replaced with a small open-source VLM — this would make a good contribution.
 
 ## Acknowledgments
 
@@ -196,7 +192,7 @@ This repository builds on and vendors code from the following projects:
 - [SAM 2](https://github.com/facebookresearch/sam2) (Apache-2.0) and [SAM 3](https://github.com/facebookresearch/sam3) (SAM License) — VOS models, vendored in `vendor/` with their original licenses
 - [TrackEval](https://github.com/JonathonLuiten/TrackEval) (MIT) — evaluation (`TrackEval/`)
 - [GTA](https://github.com/sjc042/gta-link) — global tracklet association formulation
-- Jersey OCR follows [Koshkina & Elder](https://github.com/mkoshkina/jersey-number-pipeline), using [ViTPose](https://github.com/ViTAE-Transformer/ViTPose) and [PARSeq](https://github.com/baudm/parseq) via HuggingFace Transformers
+- Jersey OCR follows [Koshkina & Elder](https://github.com/mkoshkina/jersey-number-pipeline), using [ViTPose](https://github.com/ViTAE-Transformer/ViTPose) and [PARSeq](https://github.com/baudm/parseq) via standalone inference-only implementations (`selective_mask_propagation/{vitpose,parseq}/`)
 
 Code written for this project is MIT-licensed (see `LICENSE`). Vendored components retain their original licenses.
 

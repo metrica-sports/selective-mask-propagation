@@ -6,6 +6,7 @@ __pycache__/
 *.so
 .DS_Store
 results/
+refs/
 **/checkpoints/**
 temp*.mp4
 data
@@ -29,3 +30,4 @@ vendor/sam3/assets/
 vendor/sam3/examples/
 vendor/sam3/scripts/
 vendor/sam3/.github/
+val_ref.log

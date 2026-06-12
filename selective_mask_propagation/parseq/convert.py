@@ -1,6 +1,6 @@
 """Convert the released baudm/parseq checkpoint to local safetensors.
 
-Not wired into the pipeline. Run once when first setting up PARSeq, or
+One-time utility: run once when first setting up PARSeq, or
 again if the upstream URL changes. Downloads the .pt checkpoint via
 torch.hub, saves it as safetensors with a matching config json under
 checkpoints/, where loader.py picks it up.
