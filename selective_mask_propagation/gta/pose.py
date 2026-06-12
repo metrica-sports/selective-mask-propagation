@@ -22,20 +22,6 @@ VITPOSE_MODEL = "usyd-community/vitpose-plus-base"
 POSE_BATCH = 256  # crops per forward; frames accumulate until this fills
 
 
-def _frame_generator(source_path: str):
-    """Yield (total_frames, frame_iterator) for an image sequence directory."""
-    frame_dir = Path(source_path) / "img1"
-    frame_files = sorted(frame_dir.glob("*.jpg"))
-    if not frame_files:
-        raise FileNotFoundError(f"No jpg frames found in {frame_dir}")
-
-    def gen():
-        for f in frame_files:
-            yield cv2.imread(str(f))
-
-    return len(frame_files), gen()
-
-
 class _FrameDataset(torch.utils.data.Dataset):
     """Worker-decoded RGB frames for an image sequence directory."""
 

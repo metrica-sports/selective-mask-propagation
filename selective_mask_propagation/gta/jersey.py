@@ -8,6 +8,7 @@ Ported from SAM-SORT: jersey.py + vote.py
 """
 
 from collections import Counter
+from pathlib import Path
 from typing import Dict, List, Tuple
 
 import cv2
@@ -17,7 +18,7 @@ from PIL import Image
 from torchvision import transforms as T
 from tqdm import tqdm
 
-from .pose import crop_torso, is_legible, _frame_generator
+from .pose import crop_torso, is_legible
 
 MIN_OCR_CONFIDENCE = 0.9
 MIN_READ_COUNT = 4
@@ -57,6 +58,55 @@ def _crop_occluded(crop_bbox, det_idx, dets, threshold=CROP_OCCLUSION_THRESHOLD)
     return False
 
 
+class _CropDataset(torch.utils.data.Dataset):
+    """Worker-side decode → torso crop → occlusion filter → PARSeq transform.
+
+    One item per frame that has at least one legible pose. The expensive
+    per-frame CPU work (JPEG decode, crop, PIL bicubic resize) runs in
+    DataLoader workers so the main loop only sees ready crop tensors.
+    """
+
+    def __init__(self, entries: List[Tuple[int, List[int]]], frame_files: List[Path],
+                 detections: Dict[int, np.ndarray], pose_data: Dict[int, list],
+                 img_size: Tuple[int, int]):
+        self.entries = entries
+        self.frame_files = frame_files
+        self.detections = detections
+        self.pose_data = pose_data
+        self.transform = T.Compose([
+            T.Resize(img_size, T.InterpolationMode.BICUBIC),
+            T.ToTensor(),
+            T.Normalize(0.5, 0.5),
+        ])
+
+    def __len__(self) -> int:
+        return len(self.entries)
+
+    def __getitem__(self, i: int):
+        frame_idx, candidates = self.entries[i]
+        frame = cv2.imread(str(self.frame_files[frame_idx]))
+        dets = self.detections[frame_idx]
+        poses = self.pose_data[frame_idx]
+
+        crop_indices = []
+        crop_tensors = []
+        raw_crops = []
+        for det_idx in candidates:
+            pose = poses[det_idx]
+            crop, crop_bbox = crop_torso(frame, pose["keypoints"], pose["scores"])
+            if crop is None:
+                continue
+            # Skip if another detection overlaps the crop region
+            if _crop_occluded(crop_bbox, det_idx, dets):
+                continue
+            raw_crops.append(crop)
+            crop_rgb = Image.fromarray(cv2.cvtColor(crop, cv2.COLOR_BGR2RGB))
+            crop_tensors.append(self.transform(crop_rgb))
+            crop_indices.append(det_idx)
+
+        return frame_idx, crop_indices, crop_tensors, raw_crops
+
+
 def run_jersey_ocr(
     source_path: str,
     detections: Dict[int, np.ndarray],
@@ -69,6 +119,11 @@ def run_jersey_ocr(
     with a legible pose gets OCR'd. Track mapping happens downstream in
     aggregate_jersey_numbers.
 
+    A metadata sweep over pose_data picks the frames worth decoding, then
+    DataLoader workers decode and prepare crop tensors while the main loop
+    runs PARSeq one frame-batch at a time (batch composition — and thus
+    output — is identical to the previous per-frame loop).
+
     Args:
         parseq: (model, tokenizer) from gta.models.get_parseq().
 
@@ -79,71 +134,64 @@ def run_jersey_ocr(
     parseq_model, tokenizer = parseq
     device = next(parseq_model.parameters()).device
     img_size = parseq_model.encoder.patch_embed.img_size
-    img_transform = T.Compose([
-        T.Resize(img_size, T.InterpolationMode.BICUBIC),
-        T.ToTensor(),
-        T.Normalize(0.5, 0.5),
-    ])
 
-    total_frames, frame_gen = _frame_generator(source_path)
+    frame_dir = Path(source_path) / "img1"
+    frame_files = sorted(frame_dir.glob("*.jpg"))
+    if not frame_files:
+        raise FileNotFoundError(f"No jpg frames found in {frame_dir}")
+
     ocr_results: Dict[int, list] = {}
     all_crops: Dict[int, dict] = {}
 
-    for frame_idx, frame in enumerate(tqdm(frame_gen, total=total_frames, desc="Jersey OCR")):
-        poses = pose_data.get(frame_idx, [])
+    entries: List[Tuple[int, List[int]]] = []
+    for frame_idx in range(len(frame_files)):
         dets = detections.get(frame_idx)
         if dets is None or len(dets) == 0:
             ocr_results[frame_idx] = []
             continue
+        ocr_results[frame_idx] = [None] * len(dets)
+        poses = pose_data.get(frame_idx, [])
+        candidates = [det_idx for det_idx, pose in enumerate(poses)
+                      if pose is not None and is_legible(pose["keypoints"], pose["scores"])]
+        if candidates:
+            entries.append((frame_idx, candidates))
 
-        crop_indices = []
-        crop_tensors = []
-        raw_crops = []
-        for det_idx, pose in enumerate(poses):
-            if pose is None:
-                continue
-            if not is_legible(pose["keypoints"], pose["scores"]):
-                continue
-            crop, crop_bbox = crop_torso(frame, pose["keypoints"], pose["scores"])
-            if crop is None:
-                continue
-            # Skip if another detection overlaps the crop region
-            if _crop_occluded(crop_bbox, det_idx, dets):
-                continue
-            raw_crops.append(crop)
-            crop_rgb = Image.fromarray(cv2.cvtColor(crop, cv2.COLOR_BGR2RGB))
-            crop_tensors.append(img_transform(crop_rgb))
-            crop_indices.append(det_idx)
+    loader = torch.utils.data.DataLoader(
+        _CropDataset(entries, frame_files, detections, pose_data, img_size),
+        batch_size=None, num_workers=4, prefetch_factor=4,
+    )
 
-        frame_results = [None] * len(dets)
+    for frame_idx, crop_indices, crop_tensors, raw_crops in tqdm(
+        loader, total=len(entries), desc="Jersey OCR"
+    ):
+        if not crop_indices:
+            continue
 
+        batch = torch.stack(crop_tensors).to(device)
+        with torch.no_grad():
+            logits = parseq_model(tokenizer, batch)
+            probs = logits.softmax(-1)
+            labels, confidences = tokenizer.decode(probs)
+
+        frame_results = ocr_results[frame_idx]
         frame_crops = {}
+        for i, det_idx in enumerate(crop_indices):
+            crop = raw_crops[i]
+            frame_crops[det_idx] = crop.numpy() if isinstance(crop, torch.Tensor) else crop
+            char_confs = confidences[i]
+            conf = char_confs.prod().item() if len(char_confs) > 0 else 0.0
+            label = labels[i]
 
-        if crop_tensors:
-            batch = torch.stack(crop_tensors).to(device)
-            with torch.no_grad():
-                logits = parseq_model(tokenizer, batch)
-                probs = logits.softmax(-1)
-                labels, confidences = tokenizer.decode(probs)
+            if not label.isdigit() or not (1 <= int(label) <= 99) or int(label) in (1, 7):
+                label = ""
+                conf = 0.0
 
-            for i, det_idx in enumerate(crop_indices):
-                frame_crops[det_idx] = raw_crops[i]
-                char_confs = confidences[i]
-                conf = char_confs.prod().item() if len(char_confs) > 0 else 0.0
-                label = labels[i]
+            frame_results[det_idx] = {
+                "label": label,
+                "confidence": conf,
+            }
 
-                if not label.isdigit() or not (1 <= int(label) <= 99) or int(label) in (1, 7):
-                    label = ""
-                    conf = 0.0
-
-                frame_results[det_idx] = {
-                    "label": label,
-                    "confidence": conf,
-                }
-
-        ocr_results[frame_idx] = frame_results
-        if frame_crops:
-            all_crops[frame_idx] = frame_crops
+        all_crops[frame_idx] = frame_crops
 
     return ocr_results, all_crops
 
