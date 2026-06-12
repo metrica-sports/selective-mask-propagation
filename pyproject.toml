@@ -34,6 +34,11 @@ gta = [
     "pydantic",
     "python-dotenv",
     "scikit-learn>=1.8.0",
+    # not imported by our code: runtime deps of PARSeq (jersey OCR via torch.hub),
+    # whose model code imports them at module level
+    "pytorch-lightning>=2.6.1",
+    "nltk>=3.9.3",
+    "timm",
 ]
 
 [tool.uv.sources]
