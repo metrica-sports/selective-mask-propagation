@@ -43,6 +43,6 @@ sam3 = { workspace = true, editable = true }
 [tool.uv.workspace]
 members = [
     "TrackEval",
-    "sam2",
-    "sam3",
+    "vendor/sam2",
+    "vendor/sam3",
 ]

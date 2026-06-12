@@ -359,7 +359,7 @@ def build_predictor():
     from sam2.build_sam import build_sam2_video_predictor
 
     repo_root = Path(__file__).parent.parent.parent
-    checkpoint = repo_root / "sam2" / "checkpoints" / "sam2.1_hiera_large.pt"
+    checkpoint = repo_root / "vendor" / "sam2" / "checkpoints" / "sam2.1_hiera_large.pt"
     config = "configs/sam2.1/sam2.1_hiera_l.yaml"
     print("Building SAM2 predictor...")
     predictor = build_sam2_video_predictor(config, str(checkpoint))

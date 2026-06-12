@@ -41,9 +41,9 @@ uv sync
 
 ### SAM Checkpoints
 
-SAM2 (download into `sam2/checkpoints/`):
+SAM2 (download into `vendor/sam2/checkpoints/`):
 ```bash
-cd sam2/checkpoints && bash download_ckpts.sh && cd ../..
+cd vendor/sam2/checkpoints && bash download_ckpts.sh && cd ../../..
 ```
 
 SAM3 checkpoints are downloaded automatically on first use.
