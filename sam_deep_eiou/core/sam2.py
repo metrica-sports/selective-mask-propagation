@@ -17,18 +17,19 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-MARGIN_ENTRY = 0.05
-MARGIN_EXIT = 0.10
-EXIT_CONSECUTIVE = 5
-SEED_MARGIN = 0.10
-SEED_CONSECUTIVE = 5
-IOMA_EXIT = 0.80
-SEED_CLEAN_IOU = 0.10
-MASK_OVERLAP_EXIT = 0.90
-AREA_DEGRADATION = 0.25
-GAP_TRIGGER = 7
-
-from ..utils.shared_constants import SAM_BORDER_MARGIN
+from ..config import (
+    MARGIN_ENTRY,
+    MARGIN_EXIT,
+    EXIT_CONSECUTIVE,
+    SEED_MARGIN,
+    SEED_CONSECUTIVE,
+    IOMA_EXIT,
+    SEED_CLEAN_IOU,
+    MASK_OVERLAP_EXIT,
+    AREA_DEGRADATION,
+    GAP_TRIGGER,
+    SAM_BORDER_MARGIN,
+)
 
 
 class WindowOutcome(Enum):

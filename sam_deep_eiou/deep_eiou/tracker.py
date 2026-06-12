@@ -4,7 +4,7 @@ from typing import Dict, Tuple
 from . import matching
 from .basetrack import BaseTrack, TrackState
 from .kalman_filter import KalmanFilter
-from ..utils.shared_constants import BORDER_MARGIN
+from ..config import BORDER_MARGIN
 
 
 class STrack(BaseTrack):

@@ -11,7 +11,7 @@ import numpy as np
 from scipy.optimize import linear_sum_assignment
 
 from .kalman_filter import KalmanFilter
-from ..utils.shared_constants import BORDER_MARGIN
+from ..config import BORDER_MARGIN
 
 
 def _linear_assignment(cost_matrix):

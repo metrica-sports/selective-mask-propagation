@@ -13,7 +13,7 @@ import numpy as np
 from tqdm import tqdm
 
 from .merge import TrackData
-from ..utils.shared_constants import BORDER_MARGIN, SAM_BORDER_MARGIN
+from ..config import BORDER_MARGIN, SAM_BORDER_MARGIN
 
 
 def _tracks_to_merged(tracks: Dict[int, Dict[int, np.ndarray]]) -> Dict[int, Dict[int, TrackData]]:

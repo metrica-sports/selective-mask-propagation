@@ -12,7 +12,7 @@ import numpy as np
 from ..deep_eiou.kalman_filter import KalmanFilter
 from ..deep_eiou import matching
 from ..deep_eiou.basetrack import BaseTrack, TrackState
-from ..utils.shared_constants import BORDER_MARGIN
+from ..config import BORDER_MARGIN
 
 
 class STrack(BaseTrack):
