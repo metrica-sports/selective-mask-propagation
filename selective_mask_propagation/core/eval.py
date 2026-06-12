@@ -4,7 +4,7 @@ import json
 import shutil
 import tempfile
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 
 import numpy as np
 from scipy.optimize import linear_sum_assignment
@@ -58,8 +58,8 @@ def step_eval(source_path: str, output_dir: str, suffix: str = "", no_gta: bool 
 
     for label, r in columns:
         md += f"\n**{label}**\n\n"
-        md += f"| TP | FP | FN | Frag | MOTP |\n"
-        md += f"|----|----|----|----- |------|\n"
+        md += "| TP | FP | FN | Frag | MOTP |\n"
+        md += "|----|----|----|----- |------|\n"
         md += f"| {r['clr_tp']} | {r['clr_fp']} | {r['clr_fn']} | {r['frag']} | {r['motp']:.1f} |\n"
 
     eval_path = Path(output_dir) / "eval.md"

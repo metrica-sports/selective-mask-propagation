@@ -178,7 +178,7 @@ def main():
         print_detail(results, [args.phase])
     else:
         print_comparison(results, phases)
-        print(f"\n\n── Deep-EIoU vs SAM-Deep-EIoU per-clip ──\n")
+        print("\n\n── Deep-EIoU vs SAM-Deep-EIoU per-clip ──\n")
         print_detail(results, ["deep_eiou", "sam_deep_eiou"])
 
     if args.sports:

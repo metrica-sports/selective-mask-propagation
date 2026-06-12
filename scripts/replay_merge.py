@@ -21,7 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import selective_mask_propagation.core.sam2  # noqa: E402
+import selective_mask_propagation.core.sam2  # noqa: E402,F401 — needed for the sam_deep_eiou pickle alias below
 from selective_mask_propagation.core.merge import step_merge, extract_bboxes  # noqa: E402
 from selective_mask_propagation.utils.export import export_mot  # noqa: E402
 

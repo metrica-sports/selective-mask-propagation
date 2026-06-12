@@ -47,3 +47,9 @@ members = [
     "vendor/sam2",
     "vendor/sam3",
 ]
+
+[tool.ruff]
+exclude = ["vendor", "TrackEval", "scripts/internal"]
+
+[tool.ruff.lint]
+select = ["F", "E9"]

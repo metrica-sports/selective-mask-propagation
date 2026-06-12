@@ -6,7 +6,6 @@
 #   Zhou et al. Learning Generalisable Omni-Scale Representations
 #     for Person Re-Identification. TPAMI, 2021.
 
-import torch
 from torch import nn
 from torch.nn import functional as F
 

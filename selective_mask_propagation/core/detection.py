@@ -66,7 +66,6 @@ def _load_det_txt(source_path: str) -> Dict[int, np.ndarray]:
         raise FileNotFoundError(f"No detections found: {det_path}")
 
     frame_boxes = defaultdict(list)
-    frame_scores = defaultdict(list)
     for line in det_path.read_text().strip().split("\n"):
         parts = line.split(",")
         frame_idx = int(parts[0]) - 1

@@ -17,7 +17,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import selective_mask_propagation.core.sam2  # noqa: E402
+import selective_mask_propagation.core.sam2  # noqa: E402,F401 — needed for the sam_deep_eiou pickle alias below
 
 # Artifacts pickled before the rename reference sam_deep_eiou.* paths.
 sys.modules.setdefault("sam_deep_eiou", sys.modules["selective_mask_propagation"])

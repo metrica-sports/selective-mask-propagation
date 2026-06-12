@@ -170,7 +170,7 @@ def run_sweep_on_clip(
     seq_info = read_sequence_info(source_path)
     detections, embeddings = detect_precomputed(source_path)
 
-    print(f"  Warming up CUDA...")
+    print("  Warming up CUDA...")
     _warmup(predictor, detections, embeddings, source_path, seq_info)
 
     sweep_results = []

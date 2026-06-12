@@ -10,7 +10,7 @@ Ported verbatim from:
 
 import itertools
 import math
-from typing import Optional, Union
+from typing import Optional
 
 import cv2
 import numpy as np

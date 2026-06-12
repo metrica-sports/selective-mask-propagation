@@ -2,7 +2,6 @@
 
 import glob
 import os
-from collections import defaultdict
 from typing import Dict
 
 import cv2
