@@ -7,6 +7,7 @@ dynamic object add/remove by holding one tracker state per birth
 cohort. Also hosts run_sam_uniform, the uniform-dispatch baseline.
 """
 
+import functools
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -46,8 +47,9 @@ def step_sam(
     return sam_masks, windows, rename_events, match_history
 
 
+@functools.cache
 def build_predictor():
-    """Build SAM3 tracker with detector backbone attached."""
+    """Build SAM3 tracker with detector backbone attached. Cached — one build per process."""
     from sam3.model_builder import build_sam3_video_model
 
     print("Building SAM3 model...")

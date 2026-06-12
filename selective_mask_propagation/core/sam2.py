@@ -8,6 +8,7 @@ mask, and that track's margin is checked. Single forward pass with
 dynamic object add/remove.
 """
 
+import functools
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -349,8 +350,9 @@ def _mask_at_border(mask: np.ndarray) -> bool:
             mask[:, :m].any() or mask[:, -m:].any())
 
 
+@functools.cache
 def build_predictor():
-    """Build SAM2 video predictor."""
+    """Build SAM2 video predictor. Cached — one build per process."""
     from sam2.build_sam import build_sam2_video_predictor
 
     repo_root = Path(__file__).parent.parent.parent
