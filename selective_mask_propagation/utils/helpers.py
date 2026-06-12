@@ -1,6 +1,7 @@
 """Pipeline helpers: step registry, cleanup, FPS reading, input expansion."""
 
 import configparser
+import json
 import shutil
 from pathlib import Path
 from typing import List
@@ -122,6 +123,16 @@ def print_step(name: str):
     print(f"\n{'='*60}")
     print(f"Step: {name}")
     print(f"{'='*60}")
+
+
+def record_timing(step: str, seconds: float, source_path: str, suffix: str = "", **extra) -> None:
+    """Record a step's wall-clock (and optional extras) into the clip's timing.json."""
+    path = get_artifacts_dir(source_path, suffix) / "timing.json"
+    data = json.loads(path.read_text()) if path.exists() else {}
+    data[step] = round(seconds, 2)
+    data.update(extra)
+    path.write_text(json.dumps(data, indent=2) + "\n")
+    print(f"{step} wall clock: {seconds:.1f}s")
 
 
 def expand_input(pattern: str) -> List[str]:

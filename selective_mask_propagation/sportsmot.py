@@ -10,10 +10,11 @@ Steps: detect, track, sam, merge, pose, jersey, classify, embed, match, interp, 
 """
 
 import argparse
+import time
 from typing import List, Optional
 
 from .utils.artifacts import get_output_dir, get_artifacts_dir, save_artifact, load_artifact
-from .utils.helpers import STEPS, GTA_STEPS, read_sequence_info, clean_steps, step_done, print_step, expand_input
+from .utils.helpers import STEPS, GTA_STEPS, read_sequence_info, clean_steps, step_done, print_step, record_timing, expand_input
 
 
 def run_pipeline(
@@ -58,13 +59,16 @@ def run_pipeline(
 
     if "detect" in steps:
         print_step("detect")
+        _t0 = time.perf_counter()
         from .core.detection import step_detect
         detections, embeddings = step_detect(source_path, precomputed)
         save_artifact("detections", detections, source_path, suffix)
         save_artifact("embeddings", embeddings, source_path, suffix)
+        record_timing("detect", time.perf_counter() - _t0, source_path, suffix)
 
     if "track" in steps:
         print_step("track")
+        _t0 = time.perf_counter()
         from .deep_eiou.tracker import step_track
         from .utils.export import export_mot
         if detections is None:
@@ -76,9 +80,14 @@ def run_pipeline(
         save_artifact("tracks", tracks, source_path, suffix)
         save_artifact("margins", margins, source_path, suffix)
         export_mot(tracks, str(artifacts_dir / "mot_deep_eiou.txt"))
+        record_timing("track", time.perf_counter() - _t0, source_path, suffix)
 
     if "sam" in steps:
         print_step("sam")
+        import torch
+        _t0 = time.perf_counter()
+        if torch.cuda.is_available():
+            torch.cuda.reset_peak_memory_stats()
         if sam3:
             from .core.sam3 import build_predictor, step_sam
         else:
@@ -99,9 +108,14 @@ def run_pipeline(
         if dev:
             from .core.debug import save_windows_debug
             save_windows_debug(windows, tracks, margins, sam_masks, source_path, output_dir)
+        _extra = {}
+        if torch.cuda.is_available():
+            _extra["sam_peak_vram_mb"] = round(torch.cuda.max_memory_allocated() / 1024**2)
+        record_timing("sam", time.perf_counter() - _t0, source_path, suffix, **_extra)
 
     if "merge" in steps:
         print_step("merge")
+        _t0 = time.perf_counter()
         from .core.merge import step_merge, extract_bboxes, TrackData, canon_key
         from .utils.export import export_mot
         if tracks is None:
@@ -143,9 +157,11 @@ def run_pipeline(
             from .core.debug import save_merge_debug
             save_merge_debug(windows, merged, tracks, renamed_margins,
                              sam_masks, rename_events, source_path, output_dir)
+        record_timing("merge", time.perf_counter() - _t0, source_path, suffix)
 
     if "pose" in steps:
         print_step("pose")
+        _t0 = time.perf_counter()
         from .gta.models import get_vitpose
         from .gta.pose import estimate_all_poses
         if detections is None:
@@ -157,9 +173,11 @@ def run_pipeline(
         if dev:
             from .gta.debug import save_pose_debug
             save_pose_debug(detections, pose_data, source_path, output_dir)
+        record_timing("pose", time.perf_counter() - _t0, source_path, suffix)
 
     if "jersey" in steps:
         print_step("jersey")
+        _t0 = time.perf_counter()
         from .gta.models import get_parseq
         from .gta.jersey import run_jersey_ocr, aggregate_jersey_numbers
         from .gta.assignments import build_assignments
@@ -187,9 +205,11 @@ def run_pipeline(
             save_crop_debug(detections, pose_data, source_path, output_dir, ocr_results)
             save_jersey_track_debug(ocr_results, crops, de_assignments, jersey_map_de, output_dir, variant="de")
             save_jersey_track_debug(ocr_results, crops, sde_assignments, jersey_map_sde, output_dir, variant="sde")
+        record_timing("jersey", time.perf_counter() - _t0, source_path, suffix)
 
     if "classify" in steps:
         print_step("classify")
+        _t0 = time.perf_counter()
         from .gta.classify import classify_tracks
 
         mot_de = str(artifacts_dir / "mot_deep_eiou.txt")
@@ -208,9 +228,11 @@ def run_pipeline(
                     info["classifications"], info["grids"],
                     output_dir, variant=variant,
                 )
+        record_timing("classify", time.perf_counter() - _t0, source_path, suffix)
 
     if "embed" in steps:
         print_step("embed")
+        _t0 = time.perf_counter()
         from .gta.embed import aggregate_embeddings
         from .gta.assignments import build_assignments
         if embeddings is None:
@@ -234,9 +256,11 @@ def run_pipeline(
             from .gta.debug import save_embed_debug
             save_embed_debug(track_embeddings_de, output_dir, variant="de")
             save_embed_debug(track_embeddings_sde, output_dir, variant="sde")
+        record_timing("embed", time.perf_counter() - _t0, source_path, suffix)
 
     if "match" in steps:
         print_step("match")
+        _t0 = time.perf_counter()
         from .gta.match import match_tracklets, save_mot_remapped
 
         mot_de = str(artifacts_dir / "mot_deep_eiou.txt")
@@ -265,9 +289,11 @@ def run_pipeline(
             from .gta.debug import save_gta_debug
             save_gta_debug(merge_events_de, canonical_to_gta_de, mot_de, source_path, output_dir, variant="de")
             save_gta_debug(merge_events_sde, canonical_to_gta_sde, mot_sde, source_path, output_dir, variant="sde")
+        record_timing("match", time.perf_counter() - _t0, source_path, suffix)
 
     if "interp" in steps:
         print_step("interp")
+        _t0 = time.perf_counter()
         from .core.interp import interpolate_tracks
         from .utils.export import export_mot, parse_mot
 
@@ -288,16 +314,20 @@ def run_pipeline(
         for f, ft in sde_gta_interp.items():
             sde_gta_combined.setdefault(f, {}).update(ft)
         export_mot(sde_gta_combined, str(artifacts_dir / "mot_sde_gta_interp.txt"))
+        record_timing("interp", time.perf_counter() - _t0, source_path, suffix)
 
     if "eval" in steps:
         print_step("eval")
+        _t0 = time.perf_counter()
         from .core.eval import step_eval
         frame_errors = step_eval(source_path, output_dir, suffix, no_gta=not gta)
         for key, errors in frame_errors.items():
             save_artifact(f"{key}_frame_errors", errors, source_path, suffix)
+        record_timing("eval", time.perf_counter() - _t0, source_path, suffix)
 
     if "render" in steps:
         print_step("render")
+        _t0 = time.perf_counter()
         from .core.render import step_render
         if tracks is None:
             tracks = load_artifact("tracks", source_path, suffix)
@@ -333,6 +363,7 @@ def run_pipeline(
                     de_gta_tracks=de_gta_tracks, de_gta_frame_errors=de_gta_fe,
                     sde_gta_tracks=sde_gta_tracks, sde_gta_frame_errors=sde_gta_fe,
                     no_gt=no_gt)
+        record_timing("render", time.perf_counter() - _t0, source_path, suffix)
 
     print("\nDone.")
 
