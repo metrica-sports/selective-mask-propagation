@@ -103,11 +103,12 @@ def save_classify_debug(
     CLASS_COLORS = {
         "team_a": (182, 107, 0),
         "team_b": (51, 122, 0),
-        "other": (128, 128, 128),
+        "special_player": (0, 165, 255),
+        "non_player": (0, 0, 200),
     }
 
     for tid, grid in sorted(grids.items()):
-        cls = classifications.get(str(tid), classifications.get(tid, "other"))
+        cls = classifications.get(str(tid), classifications.get(tid, "unknown"))
         header_color = CLASS_COLORS.get(cls, (128, 128, 128))
         header_text = f"Track {tid} -> {cls}"
 

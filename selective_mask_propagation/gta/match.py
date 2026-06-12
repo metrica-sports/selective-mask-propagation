@@ -6,6 +6,10 @@ Two-tier merge:
   2. Appearance: greedy agglomerative clustering on OSNet cosine distance.
      Vetoes (in order): temporal overlap, opposite-edge exit/entry,
      different teams, conflicting jersey numbers.
+
+Non-player tracks (referee, coach, staff) never enter matching — they
+map to themselves and are dropped from the GTA MOT output, since
+SportsMOT ground truth annotates players only.
 """
 
 from collections import defaultdict
@@ -168,19 +172,22 @@ def match_tracklets(
     """Hierarchical tracklet matching: jersey merge then appearance clustering.
 
     Algorithm:
-        1. Jersey merge: group player tracklets by (team_id, jersey_number),
+        1. Exclude non-player tracks; they map to themselves in the result.
+        2. Jersey merge: group player tracklets by (team_id, jersey_number),
            merge each group into the earliest canonical ID.
-        2. Appearance merge: greedy agglomerative clustering on cosine distance.
+        3. Appearance merge: greedy agglomerative clustering on cosine distance.
            All vetoes (temporal, spatial, team, jersey) are baked into the
            distance function — blocked pairs get distance 1.0.
-        3. Build global ID map: global_id = min(canonical_ids) per merge group.
+        4. Build global ID map: global_id = min(canonical_ids) per merge group.
 
     Returns (canonical_to_gta, merge_events).
     """
     raw = parse_mot_tracks(mot_path)
+    non_players = {tid for tid, t in track_teams.items() if not t["player"]}
     tracklets = {
         tid: {"times": [t for t, _ in entries], "bboxes": [b for _, b in entries]}
-        for tid, entries in raw.items() if tid in track_embeddings
+        for tid, entries in raw.items()
+        if tid in track_embeddings and tid not in non_players
     }
     n_initial = len(tracklets)
     embeddings = {tid: feats.copy() for tid, feats in track_embeddings.items()
@@ -272,8 +279,9 @@ def match_tracklets(
 
 def save_mot_remapped(
     output_path: str, canonical_to_gta: Dict[int, int], mot_path: str,
+    exclude_ids: set,
 ) -> None:
-    """Write MOT file by remapping track IDs."""
+    """Write MOT file by remapping track IDs, dropping excluded tracks."""
     with open(mot_path) as f:
         lines = f.readlines()
 
@@ -283,6 +291,8 @@ def save_mot_remapped(
         if not parts or not parts[0]:
             continue
         canonical_id = int(parts[1])
+        if canonical_id in exclude_ids:
+            continue
         parts[1] = str(canonical_to_gta.get(canonical_id, canonical_id))
         rows.append((int(parts[0]), ",".join(parts)))
 

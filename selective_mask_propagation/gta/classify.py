@@ -4,9 +4,12 @@ Two-phase approach:
 1. Establish team colors from sampled frames (one VLM call).
 2. Classify each track from a crop montage (one VLM call per track, async parallel).
 
-Produces track_teams: {track_id: {"team_id": 0|1|None}}.
-Tracks classified as "other" (goalkeeper, referee, etc.) get team_id=None —
-they stay in the MOT but can't participate in jersey merge or team veto.
+Produces track_teams: {track_id: {"team_id": 0|1|None, "player": bool}}.
+Special players (goalkeeper, libero) get team_id=None: they count as players
+but can't participate in jersey merge or team veto. Non-players (referee,
+coach, staff) are excluded from matching and suppressed from the GTA output —
+SportsMOT ground truth annotates players only, so every non-player box is a
+false positive.
 """
 
 import asyncio
@@ -37,7 +40,7 @@ class TeamColors(BaseModel):
 
 class TrackClassification(BaseModel):
     classification: str = Field(
-        description="Track classification: team_a, team_b, or other"
+        description="Track classification: team_a, team_b, special_player, or non_player"
     )
 
 
@@ -53,7 +56,8 @@ Team A wears {colors.team_a_color}. Team B wears {colors.team_b_color}.
 
 - team_a: Player wearing {colors.team_a_color}
 - team_b: Player wearing {colors.team_b_color}
-- other: Goalkeeper, referee, coach, sideline, or anyone not on team A/B"""
+- special_player: A player in the game wearing a different uniform from both teams (goalkeeper, libero)
+- non_player: Referee, umpire, coach, sideline staff, or anyone not playing in the game"""
 
 
 def _sample_frames(source_path: str) -> List[np.ndarray]:
@@ -223,8 +227,8 @@ async def _classify_track(
         if attempt < max_retries - 1:
             await asyncio.sleep(1)
 
-    print(f"  Warning: Gemini returned no response for track {track_id}, defaulting to 'other'")
-    return track_id, "other"
+    print(f"  Warning: Gemini returned no response for track {track_id}, defaulting to 'unknown'")
+    return track_id, "unknown"
 
 
 def classify_tracks(
@@ -234,7 +238,7 @@ def classify_tracks(
     """Classify tracks by team via VLM.
 
     Returns:
-        track_teams: {track_id: {"team_id": 0|1|None}}
+        track_teams: {track_id: {"team_id": 0|1|None, "player": bool}}
         debug_info: {colors, color_frames, classifications, grids}
     """
     return asyncio.run(_classify_tracks_async(source_path, mot_path))
@@ -276,22 +280,28 @@ async def _classify_tracks_async(
         tasks.append(_classify_track(tid, grid, prompt, clients[key_idx]))
     results = await asyncio.gather(*tasks)
 
+    # Anything unexpected (incl. the "unknown" API-failure default) is kept
+    # as an unaffiliated player — suppression must never fire on a failure.
     track_teams: Dict[int, dict] = {}
     for tid, classification in results:
         print(f"  T{tid:03d}: {classification}")
         if classification == "team_a":
-            track_teams[tid] = {"team_id": 0}
+            track_teams[tid] = {"team_id": 0, "player": True}
         elif classification == "team_b":
-            track_teams[tid] = {"team_id": 1}
+            track_teams[tid] = {"team_id": 1, "player": True}
+        elif classification == "non_player":
+            track_teams[tid] = {"team_id": None, "player": False}
         else:
-            track_teams[tid] = {"team_id": None}
+            track_teams[tid] = {"team_id": None, "player": True}
 
     classifications = {tid: cls for tid, cls in results}
 
     n_a = sum(1 for t in track_teams.values() if t["team_id"] == 0)
     n_b = sum(1 for t in track_teams.values() if t["team_id"] == 1)
-    n_other = sum(1 for t in track_teams.values() if t["team_id"] is None)
-    print(f"Classification: {n_a} team_a, {n_b} team_b, {n_other} other")
+    n_special = sum(1 for t in track_teams.values() if t["team_id"] is None and t["player"])
+    n_non = sum(1 for t in track_teams.values() if not t["player"])
+    print(f"Classification: {n_a} team_a, {n_b} team_b, "
+          f"{n_special} special_player, {n_non} non_player")
 
     debug_info = {
         "colors": colors.model_dump(),

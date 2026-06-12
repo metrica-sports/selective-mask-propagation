@@ -272,7 +272,9 @@ def run_pipeline(
             seq_info["width"], seq_info["height"],
         )
         save_artifact("canonical_to_gta_de", canonical_to_gta_de, source_path, suffix)
-        save_mot_remapped(str(artifacts_dir / "mot_de_gta.txt"), canonical_to_gta_de, mot_de)
+        non_players_de = {tid for tid, t in track_teams_de.items() if not t["player"]}
+        save_mot_remapped(str(artifacts_dir / "mot_de_gta.txt"), canonical_to_gta_de, mot_de,
+                          exclude_ids=non_players_de)
 
         mot_sde = str(artifacts_dir / "mot_sam_deep_eiou.txt")
         track_embeddings_sde = load_artifact("track_embeddings_sde", source_path, suffix)
@@ -283,7 +285,9 @@ def run_pipeline(
             seq_info["width"], seq_info["height"],
         )
         save_artifact("canonical_to_gta_sde", canonical_to_gta_sde, source_path, suffix)
-        save_mot_remapped(str(artifacts_dir / "mot_sde_gta.txt"), canonical_to_gta_sde, mot_sde)
+        non_players_sde = {tid for tid, t in track_teams_sde.items() if not t["player"]}
+        save_mot_remapped(str(artifacts_dir / "mot_sde_gta.txt"), canonical_to_gta_sde, mot_sde,
+                          exclude_ids=non_players_sde)
 
         if dev:
             from .gta.debug import save_gta_debug
