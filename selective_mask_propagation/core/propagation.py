@@ -30,6 +30,7 @@ from ..config import (
     IOMA_EXIT,
     MARGIN_EXIT,
     MASK_OVERLAP_EXIT,
+    SAM_BORDER_MARGIN,
     SEED_CLEAN_IOU,
 )
 from .sam2 import (
@@ -40,12 +41,117 @@ from .sam2 import (
     _DISPLACEMENT_TAG,
     _REVERT_TAG,
     _SWAP_TAG,
-    _bbox_from_mask,
     _box_iou,
     _deferred_seed_frame_is_valid,
-    _mask_at_border,
-    _mask_in_box,
 )
+
+
+class _FrameMaskStats:
+    """Exact mask statistics for one frame, computed on GPU before download.
+
+    Every quantity the window machine reads from a mask — area, tight bbox,
+    border contact, pairwise overlap, per-track-box IoMA — is an integer
+    reduction over a boolean mask, so computing it on GPU is bit-identical
+    to the previous full-frame numpy code while avoiding per-pixel CPU work.
+
+    Masks with zero area are dropped, mirroring the old ``mask.any()``
+    storage filter; ``cids`` preserves the input (propagation output) order.
+    """
+
+    def __init__(self, gpu_masks: Dict[int, torch.Tensor],
+                 track_boxes: Dict[int, np.ndarray]):
+        self._masks = {}
+        self._track_boxes = track_boxes
+        self._areas: Dict[int, int] = {}
+        self._bboxes: Dict[int, np.ndarray] = {}
+        self._border: Dict[int, bool] = {}
+        self._ioma_rows: Dict[int, Dict[int, float]] = {}
+
+        if not gpu_masks:
+            self.cids: List[int] = []
+            return
+
+        device = next(iter(gpu_masks.values())).device
+        h, w = next(iter(gpu_masks.values())).shape
+        ar_h = torch.arange(h, device=device)
+        ar_w = torch.arange(w, device=device)
+        m = SAM_BORDER_MARGIN
+
+        scalars = []
+        for mask in gpu_masks.values():
+            rows = mask.any(dim=1)
+            cols = mask.any(dim=0)
+            scalars.append(torch.stack([
+                mask.sum(),
+                ar_w.masked_fill(~cols, w).min(),
+                ar_h.masked_fill(~rows, h).min(),
+                ar_w.masked_fill(~cols, -1).max(),
+                ar_h.masked_fill(~rows, -1).max(),
+                (rows[:m].any() | rows[-m:].any()
+                 | cols[:m].any() | cols[-m:].any()).long(),
+            ]))
+        scalars = torch.stack(scalars).cpu().numpy()
+
+        for (cid, mask), (area, x1, y1, x2, y2, border) in zip(gpu_masks.items(), scalars):
+            if area == 0:
+                continue
+            self._masks[cid] = mask
+            self._areas[cid] = int(area)
+            self._bboxes[cid] = np.array([x1, y1, x2, y2], dtype=np.float64)
+            self._border[cid] = bool(border)
+        self.cids = list(self._masks)
+
+        pairs = [(a, b) for i, a in enumerate(self.cids) for b in self.cids[i + 1:]]
+        self._intersections: Dict[frozenset, int] = {}
+        if pairs:
+            inter = torch.stack([(self._masks[a] & self._masks[b]).sum() for a, b in pairs])
+            for (a, b), v in zip(pairs, inter.cpu().numpy()):
+                self._intersections[frozenset((a, b))] = int(v)
+
+    def __contains__(self, cid: int) -> bool:
+        return cid in self._masks
+
+    def area(self, cid: int) -> int:
+        return self._areas[cid]
+
+    def bbox(self, cid: int) -> np.ndarray:
+        return self._bboxes[cid]
+
+    def at_border(self, cid: int) -> bool:
+        return self._border[cid]
+
+    def intersection(self, cid_a: int, cid_b: int) -> int:
+        return self._intersections[frozenset((cid_a, cid_b))]
+
+    def ioma(self, cid: int) -> Dict[int, float]:
+        """IoMA of this mask against every base-tracker bbox in the frame.
+
+        Same arithmetic as ``_mask_in_box``: integer crop sum over the
+        clipped box divided by the mask area. Computed lazily — only
+        windows past their entry frame need it.
+        """
+        if cid in self._ioma_rows:
+            return self._ioma_rows[cid]
+        mask = self._masks[cid]
+        h, w = mask.shape
+        track_ids = list(self._track_boxes)
+        sums = []
+        for tid in track_ids:
+            bbox = self._track_boxes[tid]
+            x1, y1, x2, y2 = int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])
+            x1, y1 = max(0, x1), max(0, y1)
+            x2, y2 = min(w, x2), min(h, y2)
+            sums.append(mask[y1:y2, x1:x2].sum())
+        total = self._areas[cid]
+        row = {} if not sums else {
+            tid: int(s) / total
+            for tid, s in zip(track_ids, torch.stack(sums).cpu().numpy())
+        }
+        self._ioma_rows[cid] = row
+        return row
+
+    def download(self, cid: int) -> np.ndarray:
+        return self._masks[cid].cpu().numpy()
 
 
 def run_sam_windows(
@@ -125,15 +231,14 @@ def run_sam_windows(
                 continue
 
             obj_ids_out, video_res_masks = session.propagate_one_frame(frame_idx)
-            frame_masks = {}
+            gpu_masks: Dict[int, torch.Tensor] = {}
             if video_res_masks is not None:
                 for idx, obj_id in enumerate(obj_ids_out):
                     cid = int(obj_id)
-                    if cid not in active_specs:
-                        continue
-                    mask = (video_res_masks[idx][0] > 0.0).cpu().numpy()
-                    if mask.any():
-                        frame_masks[cid] = mask
+                    if cid in active_specs:
+                        gpu_masks[cid] = video_res_masks[idx][0] > 0.0
+            stats = _FrameMaskStats(gpu_masks, tracks.get(frame_idx, {}))
+            frame_masks = {cid: stats.download(cid) for cid in stats.cids}
 
             if frame_masks:
                 sam_masks[frame_idx] = frame_masks
@@ -145,17 +250,14 @@ def run_sam_windows(
             # Convergence is a pair property — both masks are killed
             # regardless of warmup/authoritative zone.
             converged = set()
-            frame_masks_now = sam_masks.get(frame_idx, {})
-            active_cids = [c for c in active_specs if c in frame_masks_now and frame_masks_now[c].any()]
+            active_cids = [c for c in active_specs if c in stats]
             seen_pairs = set()
             for i, cid_a in enumerate(active_cids):
-                mask_a = frame_masks_now[cid_a]
                 for cid_b in active_cids[i + 1:]:
                     pair = frozenset((cid_a, cid_b))
                     seen_pairs.add(pair)
-                    mask_b = frame_masks_now[cid_b]
-                    overlap = (mask_a & mask_b).sum()
-                    union = (mask_a | mask_b).sum()
+                    overlap = stats.intersection(cid_a, cid_b)
+                    union = stats.area(cid_a) + stats.area(cid_b) - overlap
                     if union > 0 and overlap / union >= MASK_OVERLAP_EXIT:
                         convergence_streaks[pair] = convergence_streaks.get(pair, 0) + 1
                         if convergence_streaks[pair] >= EXIT_CONSECUTIVE:
@@ -182,15 +284,14 @@ def run_sam_windows(
                 if frame_idx < spec.entry_frame:
                     continue
 
-                mask = frame_masks_now.get(cid)
+                has_mask = cid in stats
 
                 # Stale check: at entry, verify mask still covers before_id's bbox.
                 # If not, the base tracker reassigned the raw track — seed and
                 # entry are different people.
-                if frame_idx == spec.entry_frame and mask is not None:
-                    before_bbox = tracks.get(frame_idx, {}).get(spec.raw_id)
-                    if before_bbox is not None:
-                        ioma = _mask_in_box(mask, before_bbox)
+                if frame_idx == spec.entry_frame and has_mask:
+                    if spec.raw_id in tracks.get(frame_idx, {}):
+                        ioma = stats.ioma(cid)[spec.raw_id]
                         if ioma < IOMA_EXIT:
                             completed.append(SamWindow(
                                 before_id=spec.raw_id, canonical_id=cid,
@@ -202,7 +303,7 @@ def run_sam_windows(
                             continue
 
                 # Edge exit: mask touched border last frame, empty this frame
-                if prev_border.get(cid, False) and mask is None:
+                if prev_border.get(cid, False) and not has_mask:
                     completed.append(SamWindow(
                         before_id=spec.raw_id, canonical_id=cid,
                         seed_frame=spec.seed_frame, entry_frame=spec.entry_frame,
@@ -212,20 +313,20 @@ def run_sam_windows(
                     to_remove.append(cid)
                     continue
 
-                prev_border[cid] = mask is not None and _mask_at_border(mask)
+                prev_border[cid] = has_mask and stats.at_border(cid)
 
-                if mask is None:
+                if not has_mask:
                     exit_streaks[cid] = 0
                     streak_tracks[cid] = None
                     continue
 
                 # Match mask to best base-tracker box
-                mask_bbox = _bbox_from_mask(mask)
+                mask_bbox = stats.bbox(cid)
+                ioma_row = stats.ioma(cid)
                 best_iou = 0.0
                 best_track = None
                 for track_id, bbox in tracks.get(frame_idx, {}).items():
-                    ioma = _mask_in_box(mask, bbox)
-                    if ioma < IOMA_EXIT:
+                    if ioma_row[track_id] < IOMA_EXIT:
                         continue
                     iou = _box_iou(mask_bbox, bbox)
                     if iou > best_iou:
@@ -245,13 +346,9 @@ def run_sam_windows(
                     # Mask isolation: no other active mask's derived bbox overlaps
                     mask_isolated = True
                     for other_cid in active_specs:
-                        if other_cid == cid:
+                        if other_cid == cid or other_cid not in stats:
                             continue
-                        other_mask = sam_masks.get(frame_idx, {}).get(other_cid)
-                        if other_mask is None or not other_mask.any():
-                            continue
-                        other_bbox = _bbox_from_mask(other_mask)
-                        if _box_iou(mask_bbox, other_bbox) >= SEED_CLEAN_IOU:
+                        if _box_iou(mask_bbox, stats.bbox(other_cid)) >= SEED_CLEAN_IOU:
                             mask_isolated = False
                             break
 
@@ -265,7 +362,7 @@ def run_sam_windows(
                         if exit_streaks[cid] >= EXIT_CONSECUTIVE:
                             # Area degradation check: mask shrank vs seed
                             seed_mask = sam_masks.get(spec.seed_frame, {}).get(cid)
-                            if seed_mask is not None and mask.sum() < seed_mask.sum() * AREA_DEGRADATION:
+                            if seed_mask is not None and stats.area(cid) < seed_mask.sum() * AREA_DEGRADATION:
                                 completed.append(SamWindow(
                                     before_id=spec.raw_id, canonical_id=cid,
                                     seed_frame=spec.seed_frame, entry_frame=spec.entry_frame,
