@@ -8,7 +8,6 @@ mask, and that track's margin is checked. Single forward pass with
 dynamic object add/remove.
 """
 
-import sys
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -561,7 +560,6 @@ def run_sam(
                 mask_bbox = _bbox_from_mask(mask)
                 best_iou = 0.0
                 best_track = None
-                best_ioma = 0.0
                 for track_id, bbox in tracks.get(frame_idx, {}).items():
                     ioma = _mask_in_box(mask, bbox)
                     if ioma < IOMA_EXIT:
@@ -570,7 +568,6 @@ def run_sam(
                     if iou > best_iou:
                         best_iou = iou
                         best_track = track_id
-                        best_ioma = ioma
 
                 if best_track is not None:
                     match_history.setdefault(cid, {})[frame_idx] = best_track

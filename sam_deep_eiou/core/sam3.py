@@ -9,7 +9,6 @@ To swap: change `from .core.sam2 import step_sam` to
 `from .core.sam3 import step_sam` in cli.py.
 """
 
-import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -471,7 +470,6 @@ def run_sam(
                 mask_bbox = _bbox_from_mask(mask)
                 best_iou = 0.0
                 best_track = None
-                best_ioma = 0.0
                 for track_id, bbox in tracks.get(frame_idx, {}).items():
                     ioma = _mask_in_box(mask, bbox)
                     if ioma < IOMA_EXIT:
@@ -480,7 +478,6 @@ def run_sam(
                     if iou > best_iou:
                         best_iou = iou
                         best_track = track_id
-                        best_ioma = ioma
 
                 if best_track is not None:
                     match_history.setdefault(cid, {})[frame_idx] = best_track
