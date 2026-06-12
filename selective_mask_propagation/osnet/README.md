@@ -17,7 +17,7 @@ Input: detection crops resized to 256x128, ImageNet-normalized. Output: 512-dim 
 ## Verification
 
 ```
-uv run python -m smp.osnet.test_osnet
+uv run python -m selective_mask_propagation.osnet.test_osnet
 ```
 
 Extracts embeddings from detection crops on 10 SportsMOT val clips and compares against pre-computed `emb.npy` files via cosine similarity. Results: 100% of pairs > 0.999 cosine similarity across all clips, min similarity 0.999952.

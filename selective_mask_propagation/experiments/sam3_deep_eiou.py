@@ -21,7 +21,7 @@ Output dir is suffixed by the trigger config; the default
 canonical run lands in the natural place.
 
 CLI:
-    uv run python -m smp.experiments.sam3_deep_eiou <clip>... [--triggers margin|margin_gap|margin_gap_witness] [--stop-at N] [--force] [--no-render]
+    uv run python -m selective_mask_propagation.experiments.sam3_deep_eiou <clip>... [--triggers margin|margin_gap|margin_gap_witness] [--stop-at N] [--force] [--no-render]
 
 Outputs (per clip, in results/<parent>/<clip>/sam3_deep_eiou[-<suffix>]/):
     mot_deep_eiou.txt        Deep-EIoU baseline (always produced; DE runs as substrate).

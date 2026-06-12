@@ -6,12 +6,12 @@ corrects identity switches. Only modifies the output when positive
 evidence of a swap is found.
 
 API:
-    from smp.augment import augment
+    from selective_mask_propagation.augment import augment
     corrected_tracks = augment(tracks, margins, "path/to/sequence")
 
 Test:
-    uv run python -m smp.augment data/sportsmot/dataset/val/v_00HRwkvvjtQ_c005 --sam3
-    uv run python -m smp.augment data/dancetrack/val/dancetrack0007 --sam3
+    uv run python -m selective_mask_propagation.augment data/sportsmot/dataset/val/v_00HRwkvvjtQ_c005 --sam3
+    uv run python -m selective_mask_propagation.augment data/dancetrack/val/dancetrack0007 --sam3
 """
 
 from typing import Dict

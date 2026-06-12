@@ -11,7 +11,7 @@ own output dir. A clip with an existing ``timing.json`` is skipped unless
 to the next. Re-running the same command is idempotent.
 
 CLI:
-    uv run python -m smp.experiments.pure_sam3 <clip_dir> [<clip_dir> ...] [--text "player"] [--stop-at N] [--force] [--no-render]
+    uv run python -m selective_mask_propagation.experiments.pure_sam3 <clip_dir> [<clip_dir> ...] [--text "player"] [--stop-at N] [--force] [--no-render]
 
 Outputs (per clip, in results/<parent>/<clip>/pure_sam3/):
     mot_pure_sam3.txt    MOT-format tight-mask bboxes per frame.

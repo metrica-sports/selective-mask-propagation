@@ -19,7 +19,7 @@ persists artifacts incrementally. Idempotent on ``timing.json`` existence;
 ``--force`` invalidates.
 
 CLI:
-    uv run python -m smp.experiments.de_uniform_sam3 <clip>... [--stop-at N] [--force] [--no-render]
+    uv run python -m selective_mask_propagation.experiments.de_uniform_sam3 <clip>... [--stop-at N] [--force] [--no-render]
 
 Outputs (per clip, in results/<parent>/<clip>/de_uniform_sam3/):
     mot_deep_eiou.txt        Deep-EIoU baseline (always produced).

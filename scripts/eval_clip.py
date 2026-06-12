@@ -24,7 +24,7 @@ from typing import List
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from smp.core.eval import _eval_mot  # noqa: E402
+from selective_mask_propagation.core.eval import _eval_mot  # noqa: E402
 
 
 VARIANT_MOT_FILES = {

@@ -15,10 +15,10 @@ from huggingface_hub import hf_hub_download
 REPO_ID = "holma91/SAM-Deep-EIoU"
 
 CHECKPOINTS = [
-    ("checkpoints/yolox_x_sports_train.pth.tar", "smp/yolox/checkpoints/yolox_x_sports_train.pth.tar"),
-    ("checkpoints/yolox_x_sports_mix.pth.tar", "smp/yolox/checkpoints/yolox_x_sports_mix.pth.tar"),
-    ("checkpoints/yolox_x_dancetrack.pth.tar", "smp/yolox/checkpoints/yolox_x_dancetrack.pth.tar"),
-    ("checkpoints/osnet_sports.pth.tar", "smp/osnet/checkpoints/sports_model.pth.tar-60"),
+    ("checkpoints/yolox_x_sports_train.pth.tar", "selective_mask_propagation/yolox/checkpoints/yolox_x_sports_train.pth.tar"),
+    ("checkpoints/yolox_x_sports_mix.pth.tar", "selective_mask_propagation/yolox/checkpoints/yolox_x_sports_mix.pth.tar"),
+    ("checkpoints/yolox_x_dancetrack.pth.tar", "selective_mask_propagation/yolox/checkpoints/yolox_x_dancetrack.pth.tar"),
+    ("checkpoints/osnet_sports.pth.tar", "selective_mask_propagation/osnet/checkpoints/sports_model.pth.tar-60"),
 ]
 
 

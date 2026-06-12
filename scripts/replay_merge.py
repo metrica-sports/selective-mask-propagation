@@ -21,14 +21,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import smp.core.sam2  # noqa: E402
-from smp.core.merge import step_merge, extract_bboxes  # noqa: E402
-from smp.utils.export import export_mot  # noqa: E402
+import selective_mask_propagation.core.sam2  # noqa: E402
+from selective_mask_propagation.core.merge import step_merge, extract_bboxes  # noqa: E402
+from selective_mask_propagation.utils.export import export_mot  # noqa: E402
 
-# Artifacts pickled before the smp rename reference sam_deep_eiou.* paths.
-sys.modules.setdefault("sam_deep_eiou", sys.modules["smp"])
-sys.modules.setdefault("sam_deep_eiou.core", sys.modules["smp.core"])
-sys.modules.setdefault("sam_deep_eiou.core.sam2", sys.modules["smp.core.sam2"])
+# Artifacts pickled before the selective_mask_propagation rename reference sam_deep_eiou.* paths.
+sys.modules.setdefault("sam_deep_eiou", sys.modules["selective_mask_propagation"])
+sys.modules.setdefault("sam_deep_eiou.core", sys.modules["selective_mask_propagation.core"])
+sys.modules.setdefault("sam_deep_eiou.core.sam2", sys.modules["selective_mask_propagation.core.sam2"])
 
 
 def _load(artifacts: Path, name: str, allow_missing: bool = False):
