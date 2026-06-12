@@ -63,16 +63,16 @@ def extract_embeddings(
             continue
 
         img = Image.open(imgs[frame_idx])
-        frame_embs = []
+        crops = []
         for det in dets:
             x1, y1, x2, y2 = det[:4]
             crop = img.crop((x1, y1, x2, y2)).convert("RGB")
-            tensor = TRANSFORM(crop).unsqueeze(0).to(device)
-            with torch.no_grad():
-                feat = model(tensor)
-            frame_embs.append(feat.cpu().numpy().squeeze(0))
+            crops.append(TRANSFORM(crop))
 
-        result[frame_idx] = np.stack(frame_embs)
+        batch = torch.stack(crops).to(device)
+        with torch.no_grad():
+            feats = model(batch)
+        result[frame_idx] = feats.cpu().numpy()
 
     total = sum(len(e) for e in result.values())
     print(f"OSNet: {total} embeddings across {len(result)} frames")

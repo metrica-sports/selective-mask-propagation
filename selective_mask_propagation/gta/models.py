@@ -2,38 +2,31 @@
 
 Heavy models (ViTPose, PARSeq) persist across clips within the same
 process. This avoids reloading on every clip when using glob patterns.
+
+Both load from local safetensors via the standalone implementations in
+``selective_mask_propagation.vitpose`` / ``.parseq`` — no transformers,
+no torch.hub.
 """
 
 from typing import Any, Optional, Tuple
 
-import torch
-
 _vitpose: Optional[Tuple[Any, Any]] = None
-_parseq: Optional[Any] = None
-
-VITPOSE_MODEL = "usyd-community/vitpose-plus-base"
+_parseq: Optional[Tuple[Any, Any]] = None
 
 
 def get_vitpose() -> Tuple[Any, Any]:
+    """Returns (processor, model)."""
     global _vitpose
     if _vitpose is None:
-        from transformers import AutoProcessor, VitPoseForPoseEstimation
-
-        print(f"Loading ViTPose: {VITPOSE_MODEL}...")
-        processor = AutoProcessor.from_pretrained(VITPOSE_MODEL)
-        model = VitPoseForPoseEstimation.from_pretrained(VITPOSE_MODEL)
-        model = model.to("cuda" if torch.cuda.is_available() else "cpu").eval()
-        _vitpose = (processor, model)
-        print(f"ViTPose ready on {model.device}.")
+        from ..vitpose.loader import load_vitpose_model
+        _vitpose = load_vitpose_model()
     return _vitpose
 
 
-def get_parseq() -> Any:
+def get_parseq() -> Tuple[Any, Any]:
+    """Returns (model, tokenizer)."""
     global _parseq
     if _parseq is None:
-        print("Loading PARSeq...")
-        _parseq = torch.hub.load("baudm/parseq", "parseq", pretrained=True)
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        _parseq = _parseq.to(device).eval()
-        print(f"PARSeq ready on {device}.")
+        from ..parseq.loader import load_parseq
+        _parseq = load_parseq()
     return _parseq

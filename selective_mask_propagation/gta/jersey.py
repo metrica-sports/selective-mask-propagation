@@ -61,7 +61,7 @@ def run_jersey_ocr(
     source_path: str,
     detections: Dict[int, np.ndarray],
     pose_data: Dict[int, list],
-    parseq_model,
+    parseq: Tuple,
 ) -> Tuple[Dict[int, list], Dict[int, dict]]:
     """Run jersey OCR on all legible detections.
 
@@ -69,12 +69,16 @@ def run_jersey_ocr(
     with a legible pose gets OCR'd. Track mapping happens downstream in
     aggregate_jersey_numbers.
 
+    Args:
+        parseq: (model, tokenizer) from gta.models.get_parseq().
+
     Returns (ocr_results, crops):
         ocr_results: {frame_idx: [{"label": str, "confidence": float} | None, ...]}
         crops: {frame_idx: {det_idx: np.ndarray}} — raw torso crops for debug
     """
+    parseq_model, tokenizer = parseq
     device = next(parseq_model.parameters()).device
-    img_size = parseq_model.hparams.img_size
+    img_size = parseq_model.encoder.patch_embed.img_size
     img_transform = T.Compose([
         T.Resize(img_size, T.InterpolationMode.BICUBIC),
         T.ToTensor(),
@@ -118,9 +122,9 @@ def run_jersey_ocr(
         if crop_tensors:
             batch = torch.stack(crop_tensors).to(device)
             with torch.no_grad():
-                logits = parseq_model(batch)
+                logits = parseq_model(tokenizer, batch)
                 probs = logits.softmax(-1)
-                labels, confidences = parseq_model.tokenizer.decode(probs)
+                labels, confidences = tokenizer.decode(probs)
 
             for i, det_idx in enumerate(crop_indices):
                 frame_crops[det_idx] = raw_crops[i]
