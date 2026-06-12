@@ -12,9 +12,9 @@ on every clip in the input list. Per-clip artifacts persist incrementally to
 file already present is skipped unless ``--force`` is passed.
 
 CLI:
-    uv run python -m sam_deep_eiou.scaling <clip>... --variant de_uniform_sam3
-    uv run python -m sam_deep_eiou.scaling <clip>... --variant sam3_deep_eiou
-    uv run python -m sam_deep_eiou.scaling <clip>... --variant sam3_deep_eiou --triggers margin_gap
+    uv run python -m sam_deep_eiou.experiments.scaling <clip>... --variant de_uniform_sam3
+    uv run python -m sam_deep_eiou.experiments.scaling <clip>... --variant sam3_deep_eiou
+    uv run python -m sam_deep_eiou.experiments.scaling <clip>... --variant sam3_deep_eiou --triggers margin_gap
 
 Variants and the file they persist to:
     de_uniform_sam3                                → de_uniform_sam3.json
@@ -46,10 +46,10 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 import torch
 
-from .core.detection import detect_precomputed
-from .core.sam3 import build_predictor, run_sam_uniform, step_sam
-from .deep_eiou.tracker import step_track
-from .utils.helpers import read_sequence_info
+from ..core.detection import detect_precomputed
+from ..core.sam3 import build_predictor, run_sam_uniform, step_sam
+from ..deep_eiou.tracker import step_track
+from ..utils.helpers import read_sequence_info
 
 
 VARIANT_DE_UNIFORM = "de_uniform_sam3"

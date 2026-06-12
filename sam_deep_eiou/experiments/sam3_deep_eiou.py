@@ -21,7 +21,7 @@ Output dir is suffixed by the trigger config; the default
 canonical run lands in the natural place.
 
 CLI:
-    uv run python -m sam_deep_eiou.sam3_deep_eiou <clip>... [--triggers margin|margin_gap|margin_gap_witness] [--stop-at N] [--force] [--no-render]
+    uv run python -m sam_deep_eiou.experiments.sam3_deep_eiou <clip>... [--triggers margin|margin_gap|margin_gap_witness] [--stop-at N] [--force] [--no-render]
 
 Outputs (per clip, in results/<parent>/<clip>/sam3_deep_eiou[-<suffix>]/):
     mot_deep_eiou.txt        Deep-EIoU baseline (always produced; DE runs as substrate).
@@ -41,14 +41,14 @@ from typing import Dict, Optional, Tuple
 import numpy as np
 import torch
 
-from .core.detection import detect_precomputed
-from .core.merge import TrackData, canon_key, extract_bboxes, step_merge
-from .core.render import render_tracker_video
-from .core.sam2 import WindowOutcome
-from .core.sam3 import build_predictor, step_sam
-from .deep_eiou.tracker import step_track
-from .utils.export import export_mot
-from .utils.helpers import read_sequence_info
+from ..core.detection import detect_precomputed
+from ..core.merge import TrackData, canon_key, extract_bboxes, step_merge
+from ..core.render import render_tracker_video
+from ..core.sam2 import WindowOutcome
+from ..core.sam3 import build_predictor, step_sam
+from ..deep_eiou.tracker import step_track
+from ..utils.export import export_mot
+from ..utils.helpers import read_sequence_info
 
 
 TRIGGER_CHOICES = ["margin", "margin_gap", "margin_gap_witness"]

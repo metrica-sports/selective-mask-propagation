@@ -19,7 +19,7 @@ persists artifacts incrementally. Idempotent on ``timing.json`` existence;
 ``--force`` invalidates.
 
 CLI:
-    uv run python -m sam_deep_eiou.de_uniform_sam3 <clip>... [--stop-at N] [--force] [--no-render]
+    uv run python -m sam_deep_eiou.experiments.de_uniform_sam3 <clip>... [--stop-at N] [--force] [--no-render]
 
 Outputs (per clip, in results/<parent>/<clip>/de_uniform_sam3/):
     mot_deep_eiou.txt        Deep-EIoU baseline (always produced).
@@ -38,13 +38,13 @@ from typing import Dict, Optional, Tuple
 import numpy as np
 import torch
 
-from .core.detection import detect_precomputed
-from .core.merge import TrackData
-from .core.render import render_tracker_video
-from .core.sam3 import build_predictor, run_sam_uniform
-from .deep_eiou.tracker import step_track
-from .utils.export import export_mot
-from .utils.helpers import read_sequence_info
+from ..core.detection import detect_precomputed
+from ..core.merge import TrackData
+from ..core.render import render_tracker_video
+from ..core.sam3 import build_predictor, run_sam_uniform
+from ..deep_eiou.tracker import step_track
+from ..utils.export import export_mot
+from ..utils.helpers import read_sequence_info
 
 
 def _truncate_frames(frame_dict: Dict[int, np.ndarray], stop_at: int) -> Dict[int, np.ndarray]:

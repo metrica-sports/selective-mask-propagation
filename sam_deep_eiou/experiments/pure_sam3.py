@@ -11,7 +11,7 @@ own output dir. A clip with an existing ``timing.json`` is skipped unless
 to the next. Re-running the same command is idempotent.
 
 CLI:
-    uv run python -m sam_deep_eiou.pure_sam3 <clip_dir> [<clip_dir> ...] [--text "player"] [--stop-at N] [--force] [--no-render]
+    uv run python -m sam_deep_eiou.experiments.pure_sam3 <clip_dir> [<clip_dir> ...] [--text "player"] [--stop-at N] [--force] [--no-render]
 
 Outputs (per clip, in results/<parent>/<clip>/pure_sam3/):
     mot_pure_sam3.txt    MOT-format tight-mask bboxes per frame.
@@ -31,8 +31,8 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-from .utils.export import export_mot
-from .utils.helpers import read_sequence_info
+from ..utils.export import export_mot
+from ..utils.helpers import read_sequence_info
 
 
 def _bbox_from_mask(mask: np.ndarray) -> Optional[np.ndarray]:
@@ -188,8 +188,8 @@ def _process_clip(
 
     render_s = 0.0
     if not no_render:
-        from .core.merge import TrackData
-        from .core.render import render_tracker_video
+        from ..core.merge import TrackData
+        from ..core.render import render_tracker_video
 
         merged: Dict[int, Dict[int, TrackData]] = {}
         for f, frame_tracks in tracks.items():
