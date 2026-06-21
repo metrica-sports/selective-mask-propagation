@@ -4,7 +4,7 @@ Selective mask propagation (SMP) for multi-object tracking. Monitors the assignm
 
 **86.8 HOTA on SportsMOT** — [#1 on the official leaderboard](https://www.codabench.org/competitions/13077/#/results-tab) (June 2026). Consistent improvements across three base trackers on DanceTrack.
 
-[[Paper]](TODO)
+[[Paper]](https://arxiv.org/abs/2606.13033)
 
 https://github.com/user-attachments/assets/1655577c-ede3-4fb0-bc71-860e771df183
 
@@ -198,4 +198,11 @@ Code written for this project is MIT-licensed (see `LICENSE`). Vendored componen
 
 ## Citation
 
-TODO when paper is up. 
+```bibtex
+@article{holmberg2026samdeepeiou,
+  title={SAM-Deep-EIoU: Selective Mask Propagation for Multi-Object Tracking},
+  author={Holmberg, Alexander},
+  journal={arXiv preprint arXiv:2606.13033},
+  year={2026}
+}
+```
