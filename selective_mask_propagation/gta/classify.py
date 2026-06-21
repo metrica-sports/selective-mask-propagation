@@ -14,6 +14,7 @@ false positive.
 
 import asyncio
 import os
+import time
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
@@ -26,6 +27,10 @@ from pydantic import BaseModel, Field
 from ..utils.export import parse_mot_tracks
 
 MODEL = "gemini-3-flash-preview"
+
+# Cap on simultaneous in-flight Gemini requests across all keys. Keeps a single
+# (e.g. free-tier) key from tripping rate limits; bump if you have headroom.
+MAX_CONCURRENT = 8
 
 N_COLOR_FRAMES = 5
 SAMPLE_INTERVAL = 15
@@ -176,7 +181,7 @@ def _generate_all_grids(
     return grids
 
 
-def _establish_colors(frames: List[np.ndarray], client: Any) -> TeamColors:
+def _establish_colors(frames: List[np.ndarray], client: Any, max_retries: int = 3) -> TeamColors:
     from google.genai import types
 
     image_parts = []
@@ -186,16 +191,28 @@ def _establish_colors(frames: List[np.ndarray], client: Any) -> TeamColors:
             types.Part.from_bytes(data=jpeg_bytes.tobytes(), mime_type="image/jpeg")
         )
 
-    response = client.models.generate_content(
-        model=MODEL,
-        contents=[ESTABLISH_PROMPT] + image_parts,
-        config={
-            "response_mime_type": "application/json",
-            "response_json_schema": TeamColors.model_json_schema(),
-        },
-    )
+    reason = "no attempts"
+    for attempt in range(max_retries):
+        try:
+            response = client.models.generate_content(
+                model=MODEL,
+                contents=[ESTABLISH_PROMPT] + image_parts,
+                config={
+                    "response_mime_type": "application/json",
+                    "response_json_schema": TeamColors.model_json_schema(),
+                },
+            )
+            if response.text is not None:
+                return TeamColors.model_validate_json(response.text)
+            reason = "empty response"
+        except Exception as e:  # transient API/network/validation error
+            reason = f"{type(e).__name__}: {e}"
+        if attempt < max_retries - 1:
+            time.sleep(2 ** attempt)
 
-    return TeamColors.model_validate_json(response.text)
+    raise RuntimeError(
+        f"Team color establishment failed after {max_retries} attempts: {reason}"
+    )
 
 
 async def _classify_track(
@@ -203,6 +220,7 @@ async def _classify_track(
     grid_image: np.ndarray,
     prompt: str,
     client: Any,
+    sem: asyncio.Semaphore,
     max_retries: int = 3,
 ) -> Tuple[int, str]:
     from google.genai import types
@@ -212,22 +230,29 @@ async def _classify_track(
         data=jpeg_bytes.tobytes(), mime_type="image/jpeg"
     )
 
+    reason = "no attempts"
     for attempt in range(max_retries):
-        response = await client.aio.models.generate_content(
-            model=MODEL,
-            contents=[prompt, image_part],
-            config={
-                "response_mime_type": "application/json",
-                "response_json_schema": TrackClassification.model_json_schema(),
-            },
-        )
-        if response.text is not None:
-            result = TrackClassification.model_validate_json(response.text)
-            return track_id, result.classification
+        try:
+            async with sem:
+                response = await client.aio.models.generate_content(
+                    model=MODEL,
+                    contents=[prompt, image_part],
+                    config={
+                        "response_mime_type": "application/json",
+                        "response_json_schema": TrackClassification.model_json_schema(),
+                    },
+                )
+            if response.text is not None:
+                result = TrackClassification.model_validate_json(response.text)
+                return track_id, result.classification
+            reason = "empty response"
+        except Exception as e:  # transient API/network/validation error
+            reason = f"{type(e).__name__}: {e}"
         if attempt < max_retries - 1:
-            await asyncio.sleep(1)
+            await asyncio.sleep(2 ** attempt)
 
-    print(f"  Warning: Gemini returned no response for track {track_id}, defaulting to 'unknown'")
+    print(f"  Warning: Gemini classification failed for track {track_id} "
+          f"({reason}), defaulting to 'unknown'")
     return track_id, "unknown"
 
 
@@ -273,12 +298,24 @@ async def _classify_tracks_async(
 
     print(f"Classifying {len(grids)} tracks with {MODEL}...")
     sorted_grids = sorted(grids.items())
+    sem = asyncio.Semaphore(MAX_CONCURRENT)
     tasks = []
     for i, (tid, grid) in enumerate(sorted_grids):
         key_idx = i % len(clients)
         print(f"  T{tid} -> key {key_idx}")
-        tasks.append(_classify_track(tid, grid, prompt, clients[key_idx]))
-    results = await asyncio.gather(*tasks)
+        tasks.append(_classify_track(tid, grid, prompt, clients[key_idx], sem))
+    raw = await asyncio.gather(*tasks, return_exceptions=True)
+
+    # _classify_track is total (always returns a tuple), but guard the gather
+    # anyway: one unexpected failure must not sink the whole clip's classify.
+    results: List[Tuple[int, str]] = []
+    for (tid, _grid), r in zip(sorted_grids, raw):
+        if isinstance(r, BaseException):
+            print(f"  Warning: track {tid} classification raised "
+                  f"{type(r).__name__}: {r}, defaulting to 'unknown'")
+            results.append((tid, "unknown"))
+        else:
+            results.append(r)
 
     # Anything unexpected (incl. the "unknown" API-failure default) is kept
     # as an unaffiliated player — suppression must never fire on a failure.
