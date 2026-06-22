@@ -11,8 +11,8 @@ Reads, for each test clip:
   - results/test/<clip>-sam3/artifacts/windows.pkl      (dispatch outcomes)
   - data/sportsmot/splits_txt/{basketball,football,volleyball}.txt  (sport label)
 
-Usage (from repo root, after a `run_sportsmot.sh test sam3` run):
-    uv run python scripts/eval_efficiency.py
+Usage (from repo root, after a `reproduce/run_sportsmot.sh test sam3` run):
+    uv run python scripts/analysis/eval_efficiency.py
 
 Notes:
   - Per-step timing for the FIRST clip of each step's batch includes one-time
@@ -30,7 +30,7 @@ import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))  # make selective_mask_propagation importable for unpickling windows
 DATA = ROOT / "data" / "sportsmot" / "dataset" / "test"
 RES = ROOT / "results" / "test"

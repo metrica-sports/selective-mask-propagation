@@ -4,7 +4,7 @@ For every clip present in both trees, reports per-variant metric deltas
 (from eval.json), MOT byte-diff status, and window-outcome shifts.
 The one-command verdict for "did my change degrade anything, and where".
 
-    uv run python scripts/compare_runs.py refs/val-<sha> results/val
+    uv run python scripts/regression/compare_runs.py refs/val-<sha> results/val
 """
 
 import argparse
@@ -14,7 +14,7 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 import selective_mask_propagation.core.sam2  # noqa: E402,F401 — needed for the sam_deep_eiou pickle alias below
 

@@ -5,7 +5,7 @@ the current code (GPU), and compares windows, rename_events, match_history,
 and sam_masks exactly against the stored artifacts. SAM inference is
 bitwise deterministic on fixed hardware, so any diff is a code change.
 
-    uv run python scripts/replay_sam.py <golden_artifacts_dir> <sequence_dir> [--sam3]
+    uv run python scripts/regression/replay_sam.py <golden_artifacts_dir> <sequence_dir> [--sam3]
 """
 
 import argparse
@@ -15,7 +15,7 @@ from pathlib import Path
 
 import numpy as np
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 import selective_mask_propagation.core.sam2  # noqa: E402,F401 — needed for the sam_deep_eiou pickle alias below
 

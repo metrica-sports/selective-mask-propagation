@@ -7,7 +7,7 @@ the exported MOT byte-for-byte against the stored mot_sam_deep_eiou.txt.
 Catches any behavior change in merge/rename/extract logic without GPU
 or re-running SAM. Point it at a results tree from a known-good run:
 
-    uv run python scripts/replay_merge.py path/to/results/test/*-sam3
+    uv run python scripts/regression/replay_merge.py path/to/results/test/*-sam3
 """
 
 import argparse
@@ -19,7 +19,7 @@ import tempfile
 import traceback
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 import selective_mask_propagation.core.sam2  # noqa: E402,F401 — needed for the sam_deep_eiou pickle alias below
 from selective_mask_propagation.core.merge import step_merge, extract_bboxes  # noqa: E402

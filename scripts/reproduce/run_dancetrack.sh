@@ -3,9 +3,9 @@
 # Each step processes all clips in one invocation (models load once).
 #
 # Usage:
-#   ./run_dancetrack.sh val sam3
-#   ./run_dancetrack.sh val sam2 --tracker bytetrack
-#   ./run_dancetrack.sh val sam3 --tracker sort
+#   bash scripts/reproduce/run_dancetrack.sh val sam3
+#   bash scripts/reproduce/run_dancetrack.sh val sam2 --tracker bytetrack
+#   bash scripts/reproduce/run_dancetrack.sh val sam3 --tracker sort
 set -e
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
@@ -33,7 +33,7 @@ if [ "$3" = "--tracker" ] && [ -n "$4" ]; then
     TRACKER_FLAG="--tracker $4"
 fi
 
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../.."
 INPUT="data/dancetrack/${SPLIT}/dancetrack*"
 
 uv run python -m selective_mask_propagation.dancetrack --input "$INPUT" $SAM_FLAG $TRACKER_FLAG --precomputed --skip-existing

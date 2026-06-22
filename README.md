@@ -112,8 +112,8 @@ mkdir -p data && ln -s /path/to/sportsmot data/sportsmot
 2. Download precomputed YOLOX detections and OSNet embeddings:
 
 ```bash
-uv run python scripts/download_precomputed.py sportsmot --split val       # 1.4 GB
-uv run python scripts/download_precomputed.py sportsmot                   # all splits, 7.5 GB
+uv run python scripts/setup/download_precomputed.py sportsmot --split val       # 1.4 GB
+uv run python scripts/setup/download_precomputed.py sportsmot                   # all splits, 7.5 GB
 ```
 
 ### DanceTrack
@@ -134,7 +134,7 @@ data/dancetrack/
 2. Download precomputed detections and embeddings:
 
 ```bash
-uv run python scripts/download_precomputed.py dancetrack                  # val, 0.6 GB
+uv run python scripts/setup/download_precomputed.py dancetrack                  # val, 0.6 GB
 ```
 
 ## Quickstart
@@ -181,17 +181,17 @@ corrected_tracks = augment(tracks, margins, "path/to/sequence", sam3=True)
 ### SportsMOT (Table 3)
 
 ```bash
-bash scripts/run_sportsmot.sh val sam3
-bash scripts/run_sportsmot.sh test sam3
-uv run python scripts/build_submission.py --sam3
+bash scripts/reproduce/run_sportsmot.sh val sam3
+bash scripts/reproduce/run_sportsmot.sh test sam3
+uv run python scripts/reproduce/build_submission.py --sam3
 ```
 
 ### DanceTrack (Table 1)
 
 ```bash
-bash scripts/run_dancetrack.sh val sam3
-bash scripts/run_dancetrack.sh val sam3 --tracker bytetrack
-bash scripts/run_dancetrack.sh val sam3 --tracker sort
+bash scripts/reproduce/run_dancetrack.sh val sam3
+bash scripts/reproduce/run_dancetrack.sh val sam3 --tracker bytetrack
+bash scripts/reproduce/run_dancetrack.sh val sam3 --tracker sort
 ```
 
 ## Global Track Association (GTA)

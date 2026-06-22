@@ -9,7 +9,7 @@ Idempotent: a MOT file with an existing ``eval.json`` is skipped unless
 attempted.
 
 CLI:
-    uv run python scripts/eval_clip.py <clip_dir>... [--variants pure_sam3,sam3_deep_eiou,...] [--force]
+    uv run python scripts/analysis/eval_clip.py <clip_dir>... [--variants pure_sam3,sam3_deep_eiou,...] [--force]
 
 Per (clip, variant) outputs (next to the MOT file):
     eval.json   {"hota": ..., "deta": ..., "assa": ..., "mota": ..., "idf1": ..., "idsw": ..., ...}
@@ -22,7 +22,7 @@ import traceback
 from pathlib import Path
 from typing import List
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from selective_mask_propagation.core.eval import _eval_mot  # noqa: E402
 

@@ -5,7 +5,7 @@ YOLOX + OSNet are only needed when running detection from scratch
 also be regenerated locally via the convert.py in each package.
 
 Usage:
-    uv run python scripts/download_checkpoints.py
+    uv run python scripts/setup/download_checkpoints.py
 """
 
 import shutil

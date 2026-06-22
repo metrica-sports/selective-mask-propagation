@@ -5,9 +5,9 @@ for each clip. These are required for --precomputed mode.
 
 Usage:
     cd SAM-Deep-EIoU
-    uv run python scripts/download_precomputed.py sportsmot --split val       # 1.4 GB
-    uv run python scripts/download_precomputed.py sportsmot                   # all splits, 7.5 GB
-    uv run python scripts/download_precomputed.py dancetrack                  # val only, 0.6 GB
+    uv run python scripts/setup/download_precomputed.py sportsmot --split val       # 1.4 GB
+    uv run python scripts/setup/download_precomputed.py sportsmot                   # all splits, 7.5 GB
+    uv run python scripts/setup/download_precomputed.py dancetrack                  # val only, 0.6 GB
 """
 
 import argparse

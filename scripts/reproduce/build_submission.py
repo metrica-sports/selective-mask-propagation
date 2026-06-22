@@ -2,8 +2,8 @@
 
 Usage:
     cd SAM-Deep-EIoU
-    uv run python scripts/build_submission.py
-    uv run python scripts/build_submission.py --variant de_gta
+    uv run python scripts/reproduce/build_submission.py
+    uv run python scripts/reproduce/build_submission.py --variant de_gta
 """
 
 import argparse
