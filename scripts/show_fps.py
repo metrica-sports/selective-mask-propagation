@@ -74,7 +74,7 @@ def main() -> None:
     max_vram = max(r[6] for r in rows)
     line = "=" * 64
     print("\n" + line)
-    print("  selective mask propagation — SAM-step throughput")
+    print("  selective mask propagation: SAM-step throughput")
     print(line)
     for sport, clip, frames, dt, fps, swaps, _ in rows:
         print(f"  {sport:<11}{clip:<21}{frames:>4} frames{dt:>8.1f}s{fps:>7.1f} fps{swaps:>3} swap")
