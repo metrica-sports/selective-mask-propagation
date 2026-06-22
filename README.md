@@ -12,6 +12,14 @@ https://github.com/user-attachments/assets/1655577c-ede3-4fb0-bc71-860e771df183
 
 https://github.com/user-attachments/assets/e1e6c7ce-27f5-4fec-89cd-0581b4c199bf
 
+## Demo
+
+No dataset needed. After `uv sync` (see [Setup](#setup)), run the SAM step on three bundled clips — one per sport — and print throughput (first run downloads the SAM 3 checkpoint):
+
+```bash
+uv run python scripts/show_fps.py
+```
+
 ## Results
 
 ### SportsMOT Test
@@ -33,28 +41,20 @@ Scored by the official remote evaluator — see the [SportsMOT leaderboard](http
 
 ## Efficiency
 
-We report the **amortized throughput of selective mask propagation**, defined as
+We report the amortized throughput of selective mask propagation:
 
-> **fps = total video frames / wall-clock(SAM propagation + merge)**, over *every* frame of the clip — not just the dispatched ones.
+> **fps = total video frames / wall-clock(SAM + merge)**, over every frame — not just the dispatched ones.
 
-This is the marginal cost the method adds on top of the base tracker. Detection (YOLOX + OSNet) and base tracking are separate, shared stages and are not counted here; the base tracker's association step runs at ~1000 fps, so the SAM step dominates the added cost.
+This is the marginal cost on top of the base tracker; detection and base tracking are separate, shared stages. Measured on SportsMOT test (150 clips, 94.8k frames) on an **RTX PRO 6000**:
 
-On SportsMOT test (150 clips, 94.8k frames, RTX PRO 6000):
+| Sport | Amortized fps |
+|---|---|
+| Basketball | 11 |
+| Football | 21 |
+| Volleyball | 11 |
+| **Overall** | **13** |
 
-| | fps (amortized) | Peak VRAM |
-|---|---|---|
-| **SAM + merge** | **~13** | **5.4 GB** (max 6.1) |
-| basketball | 11 | |
-| football | 21 | |
-| volleyball | 11 | |
-
-The cost is low **not** because SAM skips most frames — it runs on ~79% of them — but because each pass tracks only the few ambiguous objects (~4.4 on average), not all 10–22 players. Throughput therefore scales with how many windows fire, which depends on the sport and on `τ_entry`.
-
-See it on your own GPU — runs the SAM step on three bundled clips (one per sport, no dataset download needed) and prints the throughput:
-
-```bash
-uv run python scripts/show_fps.py
-```
+Peak VRAM 5.4 GB (max 6.1). The cost stays low because each SAM pass tracks only the few ambiguous objects (~4.4 on average), not every player — so throughput scales with how many windows fire. Measure it on your own GPU with [`scripts/show_fps.py`](#demo).
 
 ## Setup
 
@@ -204,9 +204,9 @@ uv run python -m selective_mask_propagation.sportsmot \
   --precomputed --gta --sam3
 ```
 
-- **Pose estimation** uses ViTPose+ (base) via a standalone implementation (`selective_mask_propagation/vitpose/`) loading local safetensors. A smaller ViTPose variant would likely produce equivalent results since only torso keypoints (shoulders + hips) are used.
+- **Pose estimation** uses ViTPose+ (base) via a standalone implementation (`selective_mask_propagation/vitpose/`); only torso keypoints (shoulders + hips) are used.
 - **Jersey OCR** uses PARSeq via a standalone implementation (`selective_mask_propagation/parseq/`), no torch.hub.
-- **Team classification** uses Gemini Flash, a proprietary API. The task is simple (classify player crop as team A, team B, or other) and could be replaced with a small open-source VLM — this would make a good contribution.
+- **Team classification** uses Gemini Flash to label each player crop (team A, B, or other) — the only proprietary dependency, swappable for an open VLM.
 
 ## Acknowledgments
 
