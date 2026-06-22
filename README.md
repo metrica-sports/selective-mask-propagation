@@ -2,9 +2,11 @@
 
 Selective mask propagation (SMP) for multi-object tracking. Monitors the assignment margin in the Hungarian cost matrix and selectively invokes SAM to preserve identity through occlusions. Only modifies the base tracker's output when positive evidence of an identity switch is found. The flagship instantiation, **SAM3-Deep-EIoU**, combines Deep-EIoU with SAM 3.
 
-**86.8 HOTA on SportsMOT** — [#1 on the official leaderboard](https://www.codabench.org/competitions/13077/#/results-tab) (June 2026). Consistent improvements across three base trackers on DanceTrack.
+**87.2 HOTA on SportsMOT** — [#1 on the official leaderboard](https://www.codabench.org/competitions/13077/#/results-tab) (June 2026). Consistent improvements across three base trackers on DanceTrack.
 
 [[Paper]](https://arxiv.org/abs/2606.13033)
+
+![SportsMOT test leaderboard — SAM3-Deep-EIoU (holma91) ranked #1 at 87.16 HOTA](https://github.com/user-attachments/assets/34037fc5-9fe9-4cb9-a8bc-472efdd12635)
 
 https://github.com/user-attachments/assets/1655577c-ede3-4fb0-bc71-860e771df183
 
@@ -19,7 +21,7 @@ Scored by the official remote evaluator — see the [SportsMOT leaderboard](http
 | Method | HOTA | AssA | IDF1 | MOTA |
 |--------|------|------|------|------|
 | Deep-EIoU | 77.2 | 67.7 | 79.8 | 96.3 |
-| SAM3-Deep-EIoU (with GTA) | **86.8** | **84.2** | **93.2** | **97.3** |
+| SAM3-Deep-EIoU (with GTA) | **87.2** | **84.2** | **93.6** | **98.1** |
 
 ### DanceTrack Val
 
@@ -28,6 +30,31 @@ Scored by the official remote evaluator — see the [SportsMOT leaderboard](http
 | SORT | 39.8 | 45.0 (+5.2) | **46.1** (+6.2) |
 | ByteTrack | 54.6 | 60.3 (+5.7) | **61.2** (+6.6) |
 | Deep-EIoU | 51.7 | 57.7 (+6.0) | **59.7** (+8.0) |
+
+## Efficiency
+
+We report the **amortized throughput of selective mask propagation**, defined as
+
+> **fps = total video frames / wall-clock(SAM propagation + merge)**, over *every* frame of the clip — not just the dispatched ones.
+
+This is the marginal cost the method adds on top of the base tracker. Detection (YOLOX + OSNet) and base tracking are separate, shared stages and are not counted here; the base tracker's association step runs at ~1000 fps, so the SAM step dominates the added cost.
+
+On SportsMOT test (150 clips, 94.8k frames, RTX PRO 6000):
+
+| | fps (amortized) | Peak VRAM |
+|---|---|---|
+| **SAM + merge** | **~13** | **5.4 GB** (max 6.1) |
+| basketball | 11 | |
+| football | 21 | |
+| volleyball | 11 | |
+
+The cost is low **not** because SAM skips most frames — it runs on ~79% of them — but because each pass tracks only the few ambiguous objects (~4.4 on average), not all 10–22 players. Throughput therefore scales with how many windows fire, which depends on the sport and on `τ_entry`.
+
+See it on your own GPU, on a single clip:
+
+```bash
+uv run python scripts/show_fps.py data/sportsmot/dataset/val/v_00HRwkvvjtQ_c005
+```
 
 ## Setup
 
