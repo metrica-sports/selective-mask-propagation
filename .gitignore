@@ -11,6 +11,7 @@ refs/
 temp*.mp4
 data
 precomputed/
+test/*/img1/
 scripts/internal/
 
 # internal working files, never commit

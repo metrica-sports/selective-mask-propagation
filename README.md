@@ -50,10 +50,10 @@ On SportsMOT test (150 clips, 94.8k frames, RTX PRO 6000):
 
 The cost is low **not** because SAM skips most frames — it runs on ~79% of them — but because each pass tracks only the few ambiguous objects (~4.4 on average), not all 10–22 players. Throughput therefore scales with how many windows fire, which depends on the sport and on `τ_entry`.
 
-See it on your own GPU, on a single clip:
+See it on your own GPU — runs the SAM step on three bundled clips (one per sport, no dataset download needed) and prints the throughput:
 
 ```bash
-uv run python scripts/show_fps.py data/sportsmot/dataset/val/v_00HRwkvvjtQ_c005
+uv run python scripts/show_fps.py
 ```
 
 ## Setup
