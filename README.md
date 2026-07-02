@@ -48,6 +48,25 @@ On SportsMOT test (150 clips, 94.8k frames), RTX PRO 6000:
 
 Peak VRAM 5.4 GB (max 6.1). Each SAM pass tracks only the few ambiguous objects, not every player. Measure it on your GPU with [`scripts/show_fps.py`](#demo).
 
+### Selective vs uniform
+
+`scripts/fps_benchmark.py` compares selective mask propagation against uniform SAM3 (a mask for every track on every frame) on four bundled broadcast clips (`bench/`: two NBA, two international football, 360–740 frames each). Both sides share the same YOLOX detections and Deep-EIoU tracks; only the dispatch differs. On an RTX 5090:
+
+| clip | frames | tracks | selective | GB | uniform | GB |
+|---|---|---|---|---|---|---|
+| basketball-1 | 600 | 12 | 8.7 fps | 5.7 | 6.0 fps | 11.3 |
+| basketball-2 | 360 | 10 | 9.5 fps | 5.5 | 6.1 fps | 8.5 |
+| soccer-1 | 600 | 30 | 37.7 fps | 5.0 | 5.0 fps | 10.1 |
+| soccer-2 | 740 | 42 | 32.4 fps | 5.0 | 5.4 fps | 9.5 |
+| **aggregate** | **2300** | | **15.8 fps** | **5.7** | **5.5 fps** | **11.3** |
+
+Reproduce (YOLOX + OSNet checkpoints needed once, then one command; `--render` writes the overlay videos to `results/bench/`):
+
+```bash
+uv run python scripts/setup/download_checkpoints.py
+uv run python scripts/fps_benchmark.py
+```
+
 ## Setup
 
 Requirements: Python 3.12, [uv](https://docs.astral.sh/uv/), CUDA GPU.
@@ -199,6 +218,26 @@ uv run python -m selective_mask_propagation.sportsmot \
 - **Pose estimation** uses ViTPose+ (base) via a standalone implementation (`selective_mask_propagation/vitpose/`); only torso keypoints (shoulders + hips) are used.
 - **Jersey OCR** uses PARSeq via a standalone implementation (`selective_mask_propagation/parseq/`), no torch.hub.
 - **Team classification** uses Gemini Flash to label each player crop (team A, B, or other). It is the only proprietary dependency, swappable for an open VLM.
+
+## Postscript: SAM 3.1
+
+[SAM 3.1 (Object Multiplex)](https://github.com/facebookresearch/sam3/blob/main/RELEASE_SAM3p1.md) was released after this project was completed. It tracks objects jointly in shared-memory buckets instead of SAM 3's per-object passes, which directly attacks the cost axis measured above — so here is the same benchmark for its native dense-tracking pipeline (`scripts/fps_sam31_native.py`: text prompt `"player"`, its own detector, `max_num_objects=32`), on the same clips and the same RTX 5090:
+
+| clip | frames | objects | fps | GB |
+|---|---|---|---|---|
+| basketball-1 | 600 | 18 | 7.2 | 23.7 |
+| basketball-2 | 360 | 15 | 9.5 | 19.0 |
+| soccer-1 | 600 | 19 | 7.4 | 24.1 |
+| soccer-2 | 740 | 24 | 6.5 | 27.2 |
+| **aggregate** | **2300** | | **7.3** | **27.2** |
+
+Multiplex makes dense tracking substantially faster than uniform SAM 3 (7.3 vs 5.5 fps aggregate — while also running its own detection, which is inseparable and therefore included; the tables above exclude detection, ~0.001 s/frame with YOLOX). Selective mask propagation is still ~2× faster at ~5× less memory: it wins by not tracking everything, not by tracking everything faster, so the two approaches compose rather than compete. The script makes three memory adjustments to fit a 32 GB card at all (the upstream demo targets 80 GB H100s); each is documented in the script.
+
+```bash
+uv run python scripts/fps_sam31_native.py     # --render for videos
+```
+
+SAM 3.1 lives in `vendor/sam3-with-3.1`, separate from the frozen `vendor/sam3` snapshot that all paper results run on: SAM 3.1 modifies shared model internals (attention/backbone refactors), and keeping both pinned keeps every reported number reproducible. Both packages import as `sam3`, so the script shadows the installed one via `sys.path` for its own process only.
 
 ## Acknowledgments
 

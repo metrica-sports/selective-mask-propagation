@@ -12,6 +12,10 @@ temp*.mp4
 data
 precomputed/
 test/*/img1/
+bench/*/img1/
+bench/*/seqinfo.ini
+bench/*/detections.pkl
+bench/*/embeddings.pkl
 scripts/internal/
 
 # internal working files, never commit
