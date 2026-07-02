@@ -16,6 +16,7 @@ scripts/internal/
 
 # internal working files, never commit
 PLAN.md
+blog-candidates/
 figures_scratch/
 assets/
 
