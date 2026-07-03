@@ -257,8 +257,8 @@ Code written for this project is MIT-licensed (see `LICENSE`). Vendored componen
 ## Citation
 
 ```bibtex
-@article{holmberg2026samdeepeiou,
-  title={SAM-Deep-EIoU: Selective Mask Propagation for Multi-Object Tracking},
+@article{holmberg2026selectivemaskpropagation,
+  title={Selective Mask Propagation for Multi-Object Tracking},
   author={Holmberg, Alexander},
   journal={arXiv preprint arXiv:2606.13033},
   year={2026}
