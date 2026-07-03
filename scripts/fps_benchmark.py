@@ -197,6 +197,19 @@ def main() -> None:
                     mask = entry.mask if entry is not None else None
                     frame_data[tid] = TrackData(bbox=bbox, mask=mask)
                 sel_merged[f] = frame_data
+            # Unlike the pipeline render (masks only where a SWAP made SAM's
+            # output authoritative), this render draws every propagated mask:
+            # a benchmark about dispatch cost should show where SAM ran, and
+            # it keeps the selective render comparable to the uniform one.
+            for f, frame_masks in sam_masks.items():
+                frame_data = sel_merged.setdefault(f, {})
+                for cid, mask in frame_masks.items():
+                    entry = frame_data.get(cid)
+                    if entry is not None:
+                        if entry.mask is None:
+                            frame_data[cid] = TrackData(bbox=entry.bbox, mask=mask)
+                    else:
+                        frame_data[cid] = TrackData(bbox=None, mask=mask)
             _render(clip_dir, "sam3_deep_eiou", sel_merged)
 
         # Uniform: SAM3 on every track from inception to death, no windows.
