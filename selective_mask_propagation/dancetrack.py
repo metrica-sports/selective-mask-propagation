@@ -62,22 +62,27 @@ def _detect_dir(source_path: str) -> Path:
     return d
 
 
-def _experiment_name(tracker: str, sam3: bool, margin_entry: float = None) -> str:
+def _experiment_name(tracker: str, sam3: bool, margin_entry: float = None,
+                     mode: str = "benchmark") -> str:
     sam_label = "sam3" if sam3 else "sam2"
     name = f"{tracker}-{sam_label}"
     if margin_entry is not None:
         name += f"-m{margin_entry}"
+    if mode != "benchmark":
+        name += f"-{mode}"
     return name
 
 
-def _experiment_dir(source_path: str, tracker: str, sam3: bool, margin_entry: float = None) -> Path:
-    d = _seq_dir(source_path) / _experiment_name(tracker, sam3, margin_entry)
+def _experiment_dir(source_path: str, tracker: str, sam3: bool, margin_entry: float = None,
+                    mode: str = "benchmark") -> Path:
+    d = _seq_dir(source_path) / _experiment_name(tracker, sam3, margin_entry, mode)
     d.mkdir(parents=True, exist_ok=True)
     return d
 
 
-def _experiment_artifacts_dir(source_path: str, tracker: str, sam3: bool, margin_entry: float = None) -> Path:
-    d = _experiment_dir(source_path, tracker, sam3, margin_entry) / "artifacts"
+def _experiment_artifacts_dir(source_path: str, tracker: str, sam3: bool, margin_entry: float = None,
+                              mode: str = "benchmark") -> Path:
+    d = _experiment_dir(source_path, tracker, sam3, margin_entry, mode) / "artifacts"
     d.mkdir(parents=True, exist_ok=True)
     return d
 
@@ -282,11 +287,12 @@ def run_pipeline(
     tracker: str = "deepeiou",
     margin_entry: float = None,
     precomputed: bool = False,
+    mode: str = "benchmark",
 ):
     seq_info = _read_seq_info(source_path)
     detect_d = _detect_dir(source_path)
-    exp_dir = _experiment_dir(source_path, tracker, sam3, margin_entry)
-    exp_art = _experiment_artifacts_dir(source_path, tracker, sam3, margin_entry)
+    exp_dir = _experiment_dir(source_path, tracker, sam3, margin_entry, mode)
+    exp_art = _experiment_artifacts_dir(source_path, tracker, sam3, margin_entry, mode)
 
     start_idx = STEPS.index(start_step)
     steps = STEPS[start_idx:] if continue_to_end else [start_step]
@@ -370,7 +376,8 @@ def run_pipeline(
 
     if "merge" in steps:
         print(f"\n{'='*60}\nStep: merge\n{'='*60}")
-        from .core.merge import step_merge, extract_bboxes, TrackData, canon_key
+        from .core.merge import (TrackData, canon_key, derive_bboxes,
+                                 extract_bboxes, step_merge, step_merge_prod)
         if tracks is None:
             tracks = _load("tracks", exp_art)
         if sam_masks is None:
@@ -384,24 +391,31 @@ def run_pipeline(
         if match_history is None:
             match_history = _load("match_history", exp_art, allow_missing=True) or {}
 
-        merged, renamed_margins, rename_map = step_merge(tracks, sam_masks, windows, margins, rename_events)
+        if mode == "prod":
+            merged, renamed_margins, rename_map = step_merge_prod(
+                tracks, sam_masks, windows, margins, rename_events)
+            sam_bboxes = derive_bboxes(merged)
+            export_mot(sam_bboxes, str(exp_art / "mot_sam.txt"))
+        else:
+            merged, renamed_margins, rename_map = step_merge(tracks, sam_masks, windows, margins, rename_events)
+
+            sam_bboxes = extract_bboxes(merged, tracks, rename_map, match_history, windows)
+            export_mot(sam_bboxes, str(exp_art / "mot_sam.txt"))
+
+            materialized = {}
+            for f, ft in sam_bboxes.items():
+                frame_data = {}
+                merged_frame = merged.get(f, {})
+                for tid, bbox in ft.items():
+                    entry = merged_frame.get(canon_key(tid))
+                    if entry is None:
+                        entry = merged_frame.get(tid)
+                    mask = entry.mask if entry is not None else None
+                    frame_data[tid] = TrackData(bbox=bbox, mask=mask)
+                materialized[f] = frame_data
+            merged = materialized
+
         _save("renamed_margins", renamed_margins, exp_art)
-
-        sam_bboxes = extract_bboxes(merged, tracks, rename_map, match_history, windows)
-        export_mot(sam_bboxes, str(exp_art / "mot_sam.txt"))
-
-        materialized = {}
-        for f, ft in sam_bboxes.items():
-            frame_data = {}
-            merged_frame = merged.get(f, {})
-            for tid, bbox in ft.items():
-                entry = merged_frame.get(canon_key(tid))
-                if entry is None:
-                    entry = merged_frame.get(tid)
-                mask = entry.mask if entry is not None else None
-                frame_data[tid] = TrackData(bbox=bbox, mask=mask)
-            materialized[f] = frame_data
-        merged = materialized
         _save("merged", merged, exp_art)
 
     if "eval" in steps:
@@ -442,6 +456,11 @@ def main(args_list: Optional[List[str]] = None):
     parser.add_argument("-d", "--dev", action="store_true", help="Save debug outputs.")
     parser.add_argument("--tracker", choices=TRACKERS, default="deepeiou", help="Base tracker.")
     parser.add_argument("--sam3", action="store_true", help="Use SAM3 instead of SAM2.")
+    parser.add_argument("--mode", choices=["benchmark", "prod"], default="benchmark",
+                        help="Output mode from the merge step onward. benchmark (default): "
+                             "identity from SAM, bbox geometry from the base tracker. "
+                             "prod: SAM masks are authoritative during healthy windows. "
+                             "Outputs to separate results dir.")
     parser.add_argument("--margin-entry", type=float, default=None, help="Margin entry threshold (default: 0.05).")
     parser.add_argument("--skip-existing", action="store_true", help="Skip steps whose artifacts already exist.")
     parser.add_argument("--precomputed", action="store_true",
@@ -458,12 +477,12 @@ def main(args_list: Optional[List[str]] = None):
             run_pipeline(source_path, args.step, args.continue_pipeline,
                          dev=args.dev, sam3=args.sam3, skip_existing=args.skip_existing,
                          tracker=args.tracker, margin_entry=args.margin_entry,
-                         precomputed=args.precomputed)
+                         precomputed=args.precomputed, mode=args.mode)
         else:
             run_pipeline(source_path, "detect", continue_to_end=True,
                          dev=args.dev, sam3=args.sam3, skip_existing=args.skip_existing,
                          tracker=args.tracker, margin_entry=args.margin_entry,
-                         precomputed=args.precomputed)
+                         precomputed=args.precomputed, mode=args.mode)
 
 
 if __name__ == "__main__":

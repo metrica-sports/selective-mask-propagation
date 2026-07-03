@@ -28,6 +28,7 @@ def run_pipeline(
     with_reid: bool = True,
     no_gt: bool = False,
     skip_existing: bool = False,
+    mode: str = "benchmark",
 ):
     seq_info = read_sequence_info(source_path)
     fps = seq_info["fps"]
@@ -36,6 +37,8 @@ def run_pipeline(
         parts.append("sam3")
     if not with_reid:
         parts.append("noreid")
+    if mode != "benchmark":
+        parts.append(mode)
     suffix = "-" + "-".join(parts) if parts else ""
     output_dir = str(get_output_dir(source_path, suffix))
     artifacts_dir = get_artifacts_dir(source_path, suffix)
@@ -116,7 +119,8 @@ def run_pipeline(
     if "merge" in steps:
         print_step("merge")
         _t0 = time.perf_counter()
-        from .core.merge import step_merge, extract_bboxes, TrackData, canon_key
+        from .core.merge import (TrackData, canon_key, derive_bboxes,
+                                 extract_bboxes, step_merge, step_merge_prod)
         from .utils.export import export_mot
         if tracks is None:
             tracks = load_artifact("tracks", source_path, suffix)
@@ -130,27 +134,33 @@ def run_pipeline(
             rename_events = load_artifact("rename_events", source_path, suffix)
         if match_history is None:
             match_history = load_artifact("match_history", source_path, suffix, allow_missing=True) or {}
-        merged, renamed_margins, rename_map = step_merge(tracks, sam_masks, windows, margins, rename_events)
+        if mode == "prod":
+            merged, renamed_margins, rename_map = step_merge_prod(
+                tracks, sam_masks, windows, margins, rename_events)
+            sde_bboxes = derive_bboxes(merged)
+            export_mot(sde_bboxes, str(artifacts_dir / "mot_sam_deep_eiou.txt"))
+        else:
+            merged, renamed_margins, rename_map = step_merge(tracks, sam_masks, windows, margins, rename_events)
+
+            sde_bboxes = extract_bboxes(merged, tracks, rename_map, match_history, windows)
+            export_mot(sde_bboxes, str(artifacts_dir / "mot_sam_deep_eiou.txt"))
+
+            # Keep merged state strictly aligned with exported MOT.
+            # Preserve masks only for tracks that survive into sde_bboxes.
+            materialized = {}
+            for f, ft in sde_bboxes.items():
+                frame_data = {}
+                merged_frame = merged.get(f, {})
+                for tid, bbox in ft.items():
+                    entry = merged_frame.get(canon_key(tid))
+                    if entry is None:
+                        entry = merged_frame.get(tid)
+                    mask = entry.mask if entry is not None else None
+                    frame_data[tid] = TrackData(bbox=bbox, mask=mask)
+                materialized[f] = frame_data
+            merged = materialized
+
         save_artifact("renamed_margins", renamed_margins, source_path, suffix)
-
-        sde_bboxes = extract_bboxes(merged, tracks, rename_map, match_history, windows)
-        export_mot(sde_bboxes, str(artifacts_dir / "mot_sam_deep_eiou.txt"))
-
-        # Keep merged state strictly aligned with exported MOT.
-        # Preserve masks only for tracks that survive into sde_bboxes.
-        materialized = {}
-        for f, ft in sde_bboxes.items():
-            frame_data = {}
-            merged_frame = merged.get(f, {})
-            for tid, bbox in ft.items():
-                entry = merged_frame.get(canon_key(tid))
-                if entry is None:
-                    entry = merged_frame.get(tid)
-                mask = entry.mask if entry is not None else None
-                frame_data[tid] = TrackData(bbox=bbox, mask=mask)
-            materialized[f] = frame_data
-        merged = materialized
-
         save_artifact("merged", merged, source_path, suffix)
 
         if dev:
@@ -380,6 +390,12 @@ def main(args_list: Optional[List[str]] = None):
                         help="Save debug outputs.")
     parser.add_argument("--sam3", action="store_true",
                         help="Use SAM3 instead of SAM2. Outputs to separate results dir.")
+    parser.add_argument("--mode", choices=["benchmark", "prod"], default="benchmark",
+                        help="Output mode from the merge step onward. benchmark (default): "
+                             "identity from SAM, bbox geometry from Deep-EIoU — what all "
+                             "paper numbers use. prod: SAM masks are authoritative during "
+                             "healthy windows; boxes are mask-derived. Outputs to separate "
+                             "results dir.")
     parser.add_argument("--gta", action="store_true",
                         help="Run GTA steps (pose, jersey, classify, embed, match, interp). Requires GEMINI_API_KEY.")
     parser.add_argument("--no-reid", dest="no_reid", action="store_true",
@@ -403,12 +419,12 @@ def main(args_list: Optional[List[str]] = None):
                 run_pipeline(source_path, args.step, args.continue_pipeline,
                              precomputed=args.precomputed, dev=args.dev, sam3=args.sam3,
                              gta=args.gta, with_reid=not args.no_reid, no_gt=args.no_gt,
-                             skip_existing=args.skip_existing)
+                             skip_existing=args.skip_existing, mode=args.mode)
             else:
                 run_pipeline(source_path, "detect", continue_to_end=True,
                              precomputed=args.precomputed, dev=args.dev, sam3=args.sam3,
                              gta=args.gta, with_reid=not args.no_reid, no_gt=args.no_gt,
-                             skip_existing=args.skip_existing)
+                             skip_existing=args.skip_existing, mode=args.mode)
         except Exception:
             if not args.skip_existing:
                 raise

@@ -1,16 +1,23 @@
 """Merge step: combine Deep-EIoU tracks with SAM evidence.
 
-For each frame, the output contains one TrackData per track:
-  - bbox only: Deep-EIoU owns this frame (all non-SWAP frames)
-  - mask only: SAM owns this frame (SWAP authoritative zone)
+Two modes, two answers to "what is the output while SAM is active?":
 
-Only SWAP windows produce mask overlays. CLEAN/EDGE/END windows
-confirmed DE was correct or had no identity resolution — their
-frames pass through as DE bboxes, guaranteeing SDE >= DE.
+Benchmark mode (step_merge + extract_bboxes) — identity from SAM,
+geometry from Deep-EIoU. Only SWAP windows modify the output, and even
+then the exported boxes are the DE boxes the mask settled into
+(via match_history), never mask-derived boxes: tight mask boxes cover
+only visible pixels and are systematically IoU-punished against
+full-extent ground-truth annotations. All paper numbers use this mode.
 
-Renames (swap_frame onward) are the single source of post-exit
-identity continuity. match_history provides per-frame bbox
-assignment for mask entries in extract_bboxes.
+Prod mode (step_merge_prod + derive_bboxes) — the mask is ground truth
+while a healthy window (SWAP/CLEAN/EDGE/END) is open: it replaces the
+DE box from entry to exit. During CLEAN windows DE can scramble
+identities mid-occlusion even though they resolve by exit; prod mode
+has the correct player throughout, which is what downstream consumers
+(pose, event attribution) need, at the cost of benchmark score.
+
+In both modes, renames from SWAP windows are the single source of
+post-exit identity continuity.
 """
 
 from dataclasses import dataclass
@@ -19,6 +26,13 @@ from typing import Dict, Hashable, List, Optional, Tuple
 import numpy as np
 
 from .sam2 import SamWindow, WindowOutcome
+
+HEALTHY_OUTCOMES = {
+    WindowOutcome.SWAP,
+    WindowOutcome.CLEAN,
+    WindowOutcome.EDGE,
+    WindowOutcome.END,
+}
 
 
 @dataclass
@@ -106,6 +120,85 @@ def step_merge(
     print(f"Merge: {len(rename_events)} rename events applied")
 
     return merged, renamed_margins, rename_map
+
+
+def step_merge_prod(
+    tracks: Dict[int, Dict[int, np.ndarray]],
+    sam_masks: Dict[int, Dict[int, np.ndarray]],
+    windows: List[SamWindow],
+    margins: Dict[int, Dict[int, float]],
+    rename_events: List[Tuple[int, int, int]],
+) -> Tuple[Dict[int, Dict[int, TrackData]], Dict[int, Dict[int, float]], Dict[int, List[Tuple[int, int]]]]:
+    """Prod-mode merge: SAM masks are authoritative during healthy windows.
+
+    Per player, per frame, binary state:
+      - mask only:  SAM authoritative zone (entry to exit, healthy window)
+      - bbox+mask:  SAM warmup zone (seed to entry)
+      - bbox only:  DE mode (no window, or DEGRADED/STALE)
+
+    Unlike benchmark mode there is no extract_bboxes/match_history pass:
+    identity comes from the rename map applied directly to the base layer,
+    and bbox geometry for mask-only entries is derived on demand
+    (derive_bboxes).
+
+    Returns (merged, renamed_margins, rename_map) with merged already
+    flattened to {frame: {canonical_track_id: TrackData}}.
+    """
+    rename_map = _build_rename_map(rename_events)
+
+    merged: Dict[int, Dict[int, TrackData]] = {}
+    for frame_idx, frame_tracks in tracks.items():
+        frame_data: Dict[int, TrackData] = {}
+        for raw_tid, bbox in frame_tracks.items():
+            canonical = _resolve(raw_tid, frame_idx, rename_map)
+            frame_data[canonical] = TrackData(bbox=bbox)
+        merged[frame_idx] = frame_data
+
+    healthy = [w for w in windows if w.outcome in HEALTHY_OUTCOMES]
+    for w in healthy:
+        # Warmup: mask alongside DE bbox
+        for frame_idx in range(w.seed_frame + 1, w.entry_frame):
+            mask = sam_masks.get(frame_idx, {}).get(w.canonical_id)
+            if mask is None:
+                continue
+            frame_data = merged.setdefault(frame_idx, {})
+            existing = frame_data.get(w.canonical_id)
+            bbox = existing.bbox if existing is not None else None
+            frame_data[w.canonical_id] = TrackData(bbox=bbox, mask=mask)
+        # Authoritative: mask replaces DE bbox
+        for frame_idx in range(w.entry_frame, w.exit_frame + 1):
+            mask = sam_masks.get(frame_idx, {}).get(w.canonical_id)
+            if mask is None:
+                continue
+            merged.setdefault(frame_idx, {})[w.canonical_id] = TrackData(mask=mask)
+
+    renamed_margins = _apply_renames(margins, rename_map)
+
+    print(f"Merge (prod): {len(rename_events)} renames, {len(healthy)} healthy windows, "
+          f"{len(windows) - len(healthy)} unhealthy")
+
+    return merged, renamed_margins, rename_map
+
+
+def derive_bboxes(
+    merged: Dict[int, Dict[int, TrackData]],
+) -> Dict[int, Dict[int, np.ndarray]]:
+    """Flatten prod-mode merged tracks to {frame: {track_id: bbox}}.
+
+    DE-mode entries return their bbox directly; mask-only entries derive a
+    tight bbox from the mask pixels.
+    """
+    result: Dict[int, Dict[int, np.ndarray]] = {}
+    for frame_idx, frame_data in merged.items():
+        frame_bboxes: Dict[int, np.ndarray] = {}
+        for tid, td in frame_data.items():
+            if td.bbox is not None:
+                frame_bboxes[tid] = td.bbox
+            elif td.mask is not None and td.mask.any():
+                frame_bboxes[tid] = _bbox_from_mask(td.mask)
+        if frame_bboxes:
+            result[frame_idx] = frame_bboxes
+    return result
 
 
 def _build_rename_map(

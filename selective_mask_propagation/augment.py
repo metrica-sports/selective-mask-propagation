@@ -24,6 +24,7 @@ def augment(
     margins: Dict[int, Dict[int, float]],
     source_path: str,
     sam3: bool = False,
+    mode: str = "benchmark",
 ) -> Dict[int, Dict[int, np.ndarray]]:
     """Augment tracker output with selective SAM mask propagation.
 
@@ -33,21 +34,32 @@ def augment(
             between the second-best and best assignment cost in the cost matrix.
         source_path: Path to sequence directory containing img1/.
         sam3: Use SAM3 instead of SAM2.
+        mode: "benchmark" (default) keeps the base tracker's bbox geometry and
+            uses SAM only to correct identities — what benchmark evaluators
+            reward. "prod" makes SAM masks authoritative during healthy
+            windows, so boxes are mask-derived through occlusions — better
+            per-frame identity and position, lower benchmark score.
 
     Returns:
         Corrected tracks in the same format as the input.
     """
+    if mode not in ("benchmark", "prod"):
+        raise ValueError(f"mode must be 'benchmark' or 'prod', got {mode!r}")
     if sam3:
         from .core.sam3 import build_predictor, step_sam
     else:
         from .core.sam2 import build_predictor, step_sam
 
-    from .core.merge import step_merge, extract_bboxes
+    from .core.merge import derive_bboxes, extract_bboxes, step_merge, step_merge_prod
 
     predictor = build_predictor()
     sam_masks, windows, rename_events, match_history = step_sam(predictor, tracks, margins, source_path)
-    merged, _, rename_map = step_merge(tracks, sam_masks, windows, margins, rename_events)
-    corrected = extract_bboxes(merged, tracks, rename_map, match_history, windows)
+    if mode == "prod":
+        merged, _, _ = step_merge_prod(tracks, sam_masks, windows, margins, rename_events)
+        corrected = derive_bboxes(merged)
+    else:
+        merged, _, rename_map = step_merge(tracks, sam_masks, windows, margins, rename_events)
+        corrected = extract_bboxes(merged, tracks, rename_map, match_history, windows)
 
     return corrected
 
@@ -87,6 +99,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Test augment API")
     parser.add_argument("input", help="Sequence directory")
     parser.add_argument("--sam3", action="store_true", help="Use SAM3 instead of SAM2")
+    parser.add_argument("--mode", choices=["benchmark", "prod"], default="benchmark",
+                        help="Output mode (see augment docstring)")
     args = parser.parse_args()
 
     seq_info = read_sequence_info(args.input)
@@ -99,7 +113,7 @@ if __name__ == "__main__":
                                   seq_info["width"], seq_info["height"])
 
     print("Augmenting with SAM...")
-    corrected = augment(tracks, margins, args.input, sam3=args.sam3)
+    corrected = augment(tracks, margins, args.input, sam3=args.sam3, mode=args.mode)
 
     print("\nResults:")
     _evaluate(tracks, args.input, "Deep-EIoU")
