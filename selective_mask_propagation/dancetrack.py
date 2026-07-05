@@ -63,26 +63,35 @@ def _detect_dir(source_path: str) -> Path:
 
 
 def _experiment_name(tracker: str, sam3: bool, margin_entry: float = None,
-                     mode: str = "benchmark") -> str:
+                     mode: str = "benchmark", enable_gap: bool = True,
+                     enable_witness: bool = True) -> str:
     sam_label = "sam3" if sam3 else "sam2"
     name = f"{tracker}-{sam_label}"
     if margin_entry is not None:
         name += f"-m{margin_entry}"
+    if not enable_gap:
+        name += "-nogap"
+    if not enable_witness:
+        name += "-nowit"
     if mode != "benchmark":
         name += f"-{mode}"
     return name
 
 
 def _experiment_dir(source_path: str, tracker: str, sam3: bool, margin_entry: float = None,
-                    mode: str = "benchmark") -> Path:
-    d = _seq_dir(source_path) / _experiment_name(tracker, sam3, margin_entry, mode)
+                    mode: str = "benchmark", enable_gap: bool = True,
+                    enable_witness: bool = True) -> Path:
+    d = _seq_dir(source_path) / _experiment_name(tracker, sam3, margin_entry, mode,
+                                                 enable_gap, enable_witness)
     d.mkdir(parents=True, exist_ok=True)
     return d
 
 
 def _experiment_artifacts_dir(source_path: str, tracker: str, sam3: bool, margin_entry: float = None,
-                              mode: str = "benchmark") -> Path:
-    d = _experiment_dir(source_path, tracker, sam3, margin_entry, mode) / "artifacts"
+                              mode: str = "benchmark", enable_gap: bool = True,
+                              enable_witness: bool = True) -> Path:
+    d = _experiment_dir(source_path, tracker, sam3, margin_entry, mode,
+                        enable_gap, enable_witness) / "artifacts"
     d.mkdir(parents=True, exist_ok=True)
     return d
 
@@ -288,14 +297,21 @@ def run_pipeline(
     margin_entry: float = None,
     precomputed: bool = False,
     mode: str = "benchmark",
+    enable_gap: bool = True,
+    enable_witness: bool = True,
+    no_render: bool = False,
 ):
     seq_info = _read_seq_info(source_path)
     detect_d = _detect_dir(source_path)
-    exp_dir = _experiment_dir(source_path, tracker, sam3, margin_entry, mode)
-    exp_art = _experiment_artifacts_dir(source_path, tracker, sam3, margin_entry, mode)
+    exp_dir = _experiment_dir(source_path, tracker, sam3, margin_entry, mode,
+                              enable_gap, enable_witness)
+    exp_art = _experiment_artifacts_dir(source_path, tracker, sam3, margin_entry, mode,
+                                        enable_gap, enable_witness)
 
     start_idx = STEPS.index(start_step)
     steps = STEPS[start_idx:] if continue_to_end else [start_step]
+    if no_render:
+        steps = [s for s in steps if s != "render"]
     if skip_existing:
         skipped = [s for s in steps if _step_done(s, detect_d, exp_art)]
         steps = [s for s in steps if not _step_done(s, detect_d, exp_art)]
@@ -362,7 +378,7 @@ def run_pipeline(
             margins = _load("margins", exp_art)
         predictor = build_predictor()
         t0 = time.time()
-        sam_kwargs = {}
+        sam_kwargs = {"enable_gap": enable_gap, "enable_witness": enable_witness}
         if margin_entry is not None:
             sam_kwargs["margin_entry"] = margin_entry
         sam_masks, windows, rename_events, match_history = step_sam(predictor, tracks, margins, source_path, **sam_kwargs)
@@ -462,6 +478,12 @@ def main(args_list: Optional[List[str]] = None):
                              "prod: SAM masks are authoritative during healthy windows. "
                              "Outputs to separate results dir.")
     parser.add_argument("--margin-entry", type=float, default=None, help="Margin entry threshold (default: 0.05).")
+    parser.add_argument("--no-gap", action="store_true",
+                        help="Disable the gap signal (signal-composition ablation).")
+    parser.add_argument("--no-witness", action="store_true",
+                        help="Disable the witness mechanism (signal-composition ablation).")
+    parser.add_argument("--no-render", action="store_true",
+                        help="Skip the render step (batch runs).")
     parser.add_argument("--skip-existing", action="store_true", help="Skip steps whose artifacts already exist.")
     parser.add_argument("--precomputed", action="store_true",
                         help="Use precomputed det.txt + emb.npy (skip YOLOX+OSNet).")
@@ -477,12 +499,16 @@ def main(args_list: Optional[List[str]] = None):
             run_pipeline(source_path, args.step, args.continue_pipeline,
                          dev=args.dev, sam3=args.sam3, skip_existing=args.skip_existing,
                          tracker=args.tracker, margin_entry=args.margin_entry,
-                         precomputed=args.precomputed, mode=args.mode)
+                         precomputed=args.precomputed, mode=args.mode,
+                         enable_gap=not args.no_gap, enable_witness=not args.no_witness,
+                         no_render=args.no_render)
         else:
             run_pipeline(source_path, "detect", continue_to_end=True,
                          dev=args.dev, sam3=args.sam3, skip_existing=args.skip_existing,
                          tracker=args.tracker, margin_entry=args.margin_entry,
-                         precomputed=args.precomputed, mode=args.mode)
+                         precomputed=args.precomputed, mode=args.mode,
+                         enable_gap=not args.no_gap, enable_witness=not args.no_witness,
+                         no_render=args.no_render)
 
 
 if __name__ == "__main__":
