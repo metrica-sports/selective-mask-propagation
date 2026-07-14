@@ -69,9 +69,9 @@ The identical recipe applied to three base trackers — same YOLOX detections, s
 
 | Base tracker | Baseline | + SAM 2 | + SAM 3 |
 |--------------|----------|---------|---------|
-| SORT | 39.8 | 45.0 | **46.1** |
+| SORT | 39.8 | 45.1 | **46.1** |
 | ByteTrack | 54.6 | 60.3 | **61.2** |
-| Deep-EIoU | 51.7 | 57.7 | **59.7** |
+| Deep-EIoU | 51.7 | 57.8 | **59.7** |
 
 All numbers HOTA. The gains concentrate in AssA (+7 to +11), the association component — exactly where a method that only fixes identity assignment should show up.
 
