@@ -9,7 +9,7 @@ results/
 refs/
 **/checkpoints/**
 temp*.mp4
-data
+/data
 precomputed/
 test/*/img1/
 bench/*/img1/
