@@ -209,7 +209,7 @@ This repository builds on and vendors code from the following projects:
 - [GTA](https://github.com/sjc042/gta-link): global tracklet association formulation
 - Jersey OCR follows [Koshkina & Elder](https://github.com/mkoshkina/jersey-number-pipeline), using [ViTPose](https://github.com/ViTAE-Transformer/ViTPose) and [PARSeq](https://github.com/baudm/parseq) via standalone inference-only implementations (`selective_mask_propagation/{vitpose,parseq}/`)
 
-Code written for this project is MIT-licensed (see `LICENSE`). Vendored components retain their original licenses.
+Code written for this project is MIT-licensed (see `LICENSE`). Vendored components obviously retain their original licenses.
 
 ## Citation
 
