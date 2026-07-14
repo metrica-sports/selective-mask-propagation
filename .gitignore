@@ -8,6 +8,7 @@ __pycache__/
 results/
 refs/
 **/checkpoints/**
+!vendor/sam2/checkpoints/download_ckpts.sh
 temp*.mp4
 /data
 precomputed/
@@ -22,7 +23,7 @@ scripts/internal/
 PLAN.md
 blog-candidates/
 figures_scratch/
-assets/
+/assets/
 
 # vendored upstream extras we don't carry (see vendor/*/README.md)
 vendor/sam2/demo/
@@ -33,6 +34,7 @@ vendor/sam2/tools/
 vendor/sam2/assets/
 vendor/sam2/.github/
 vendor/sam3/assets/
+vendor/sam3-with-3.1/assets/
 vendor/sam3/examples/
 vendor/sam3/scripts/
 vendor/sam3/.github/
