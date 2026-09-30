@@ -39,3 +39,6 @@ vendor/sam3/examples/
 vendor/sam3/scripts/
 vendor/sam3/.github/
 val_ref.log
+
+# setuptools build output
+build/

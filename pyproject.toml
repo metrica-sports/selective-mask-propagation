@@ -5,17 +5,24 @@ description = "Selective mask propagation for multi-object tracking"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [{ name = "Alexander Holmberg", email = "alholmbe@kth.se" }]
-requires-python = ">=3.12"
+requires-python = ">=3.10"
 dependencies = [
     "numpy",
     "scipy",
-    "lap>=0.5.12",
-    "cython-bbox>=0.1.5",
-    "opencv-python>=4.10.0.84",
     "tqdm",
-    "trackeval",
     "torch",
     "torchvision",
+    "pillow",
+]
+
+[project.optional-dependencies]
+# Everything beyond the OSNet / core utilities: the SAM tracking pipeline, TrackEval and their
+# build-heavy deps (cython-bbox needs MSVC on Windows). Upstream-style dev setup: `uv sync --extra full`.
+full = [
+    "opencv-python>=4.10.0.84",
+    "lap>=0.5.12",
+    "cython-bbox>=0.1.5",
+    "trackeval",
     "pycocotools>=2.0.11",
     "tabulate>=0.9.0",
     "sam2",
@@ -26,8 +33,6 @@ dependencies = [
     "eva-decord>=0.6.1",
     "zstandard>=0.25.0",
 ]
-
-[project.optional-dependencies]
 gta = [
     "google-genai",
     "pydantic",
@@ -35,6 +40,15 @@ gta = [
     "safetensors",
     "scikit-learn>=1.8.0",
 ]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+# Package directories carry no __init__.py, so they are namespace packages.
+include = ["selective_mask_propagation*"]
+namespaces = true
 
 [tool.uv.sources]
 trackeval = { workspace = true, editable = true }
